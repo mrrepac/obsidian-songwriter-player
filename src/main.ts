@@ -194,8 +194,21 @@ export default class SongwriterPlugin extends Plugin {
     }));
 
     this.app.workspace.onLayoutReady(() => {
+      void this.ensureViewInSidebar();
       this.handleFileOpen(this.app.workspace.getActiveFile());
     });
+  }
+
+  /**
+   * Make sure the player tab exists in the right sidebar without opening it,
+   * so it can always be found there — especially on mobile, where there is
+   * no ribbon to launch it from.
+   */
+  private async ensureViewInSidebar() {
+    const ws = this.app.workspace;
+    if (ws.getLeavesOfType(VIEW_TYPE_SONGWRITER).length > 0) return;
+    const leaf = ws.getRightLeaf(false);
+    if (leaf) await leaf.setViewState({ type: VIEW_TYPE_SONGWRITER, active: false });
   }
 
   onunload() {
