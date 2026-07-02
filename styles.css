@@ -105,8 +105,12 @@
 }
 
 .sw-ext-wrapper audio {
-  flex: 1 1 auto;
-  width: auto;
+  /* flex-basis 0 + width 100%: mobile WebViews (iOS WebKit in particular)
+     collapse an <audio> with width:auto inside a flex row to zero width —
+     the embedded player "disappears" and only the button is left. */
+  flex: 1 1 0%;
+  width: 100%;
+  min-width: 0;
   margin: 0;
 }
 
