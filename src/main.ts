@@ -1,6 +1,18 @@
 import { App, MarkdownView, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf } from "obsidian";
-import { DEFAULT_SETTINGS, SongwriterSettings, isAudioPath } from "./types";
+import { DEFAULT_SETTINGS, SongwriterSettings, TrackData, isAudioPath } from "./types";
 import { t } from "./i18n";
+
+/** Pre-1.0 data.json shapes (startPoint / named markers / BPM-key / rate). */
+interface LegacyTrackData extends Partial<TrackData> {
+  startPoint?: number | null;
+  markers?: Array<{ time?: number }>;
+}
+
+interface LegacySettings extends Partial<Omit<SongwriterSettings, "tracks">> {
+  tracks?: Record<string, LegacyTrackData>;
+  startFromPointOnLoad?: boolean;
+  rate?: number;
+}
 import { EmbedAudioButtons, openExternally, revealInExplorer } from "./external";
 import { PlayerEngine } from "./engine";
 import { SongwriterView, VIEW_TYPE_SONGWRITER } from "./view";
@@ -136,7 +148,7 @@ export default class SongwriterPlugin extends Plugin {
           new Notice(t("noTrack"));
           return;
         }
-        void openExternally(this.app, file);
+        openExternally(this.app, file);
       }
     });
 
@@ -162,7 +174,7 @@ export default class SongwriterPlugin extends Plugin {
         delete this.settings.tracks[oldPath];
         this.requestSave();
       }
-      if (this.engine.file === file) this.engine.refreshSrc();
+      if (this.engine.file === file) void this.engine.refreshSrc();
       if (this.engine.noteAudios.includes(file)) {
         this.engine.setNoteAudios([...this.engine.noteAudios]);
       }
@@ -304,17 +316,18 @@ export default class SongwriterPlugin extends Plugin {
       return;
     }
     // if the note is already open in some tab, jump there instead of reopening
+    const target = note;
     let existing: WorkspaceLeaf | null = null;
     this.app.workspace.iterateAllLeaves((leaf) => {
-      if (!existing && leaf.view instanceof MarkdownView && leaf.view.file?.path === note!.path) {
+      if (!existing && leaf.view instanceof MarkdownView && leaf.view.file?.path === target.path) {
         existing = leaf;
       }
     });
     if (existing) {
       this.app.workspace.setActiveLeaf(existing, { focus: true });
-      this.app.workspace.revealLeaf(existing);
+      await this.app.workspace.revealLeaf(existing);
     } else {
-      await this.app.workspace.getLeaf(false).openFile(note);
+      await this.app.workspace.getLeaf(false).openFile(target);
     }
   }
 
@@ -327,7 +340,7 @@ export default class SongwriterPlugin extends Plugin {
       leaf = ws.getRightLeaf(false) ?? ws.getLeaf(true);
       await leaf.setViewState({ type: VIEW_TYPE_SONGWRITER, active: true });
     }
-    ws.revealLeaf(leaf);
+    await ws.revealLeaf(leaf);
   }
 
   refreshViews() {
@@ -340,30 +353,25 @@ export default class SongwriterPlugin extends Plugin {
   // ---- persistence ----
 
   async loadSettings() {
-    const loaded = (await this.loadData()) ?? {};
-    // migrate from v0.1.0 (startPoint + named markers)
-    if (loaded.startFromPointOnLoad !== undefined && loaded.startFromMarkerOnLoad === undefined) {
-      loaded.startFromMarkerOnLoad = loaded.startFromPointOnLoad;
+    const loaded = ((await this.loadData()) ?? {}) as LegacySettings;
+    // migrate from v0.1.0 (startPoint + named markers); `rate` (playback
+    // speed, removed for now) and old per-track BPM/key fields are dropped
+    // simply by not copying them over.
+    const { tracks: loadedTracks, startFromPointOnLoad, rate, ...rest } = loaded;
+    void rate;
+    this.settings = { ...DEFAULT_SETTINGS, ...rest, tracks: {} };
+    if (startFromPointOnLoad !== undefined && rest.startFromMarkerOnLoad === undefined) {
+      this.settings.startFromMarkerOnLoad = startFromPointOnLoad;
     }
-    delete loaded.startFromPointOnLoad;
-    delete loaded.rate; // playback speed UI removed for now
-    this.settings = { ...DEFAULT_SETTINGS, tracks: {}, ...loaded };
-    if (!this.settings.tracks) this.settings.tracks = {};
-    for (const d of Object.values(this.settings.tracks)) {
-      const legacy = d as any;
-      if (d.marker === undefined) {
-        const firstMarker = Array.isArray(legacy.markers) ? legacy.markers[0]?.time : undefined;
-        d.marker = legacy.startPoint ?? firstMarker ?? null;
-      }
-      if (d.loopA === undefined) d.loopA = null;
-      if (d.loopB === undefined) d.loopB = null;
-      if (typeof d.plays !== "number") d.plays = 0;
-      if (typeof d.playedSec !== "number") d.playedSec = 0;
-      delete legacy.analyzed; // BPM/key feature removed entirely
-      delete legacy.bpm;
-      delete legacy.key;
-      delete legacy.startPoint;
-      delete legacy.markers;
+    for (const [path, raw] of Object.entries(loadedTracks ?? {})) {
+      const firstMarker = Array.isArray(raw.markers) ? raw.markers[0]?.time : undefined;
+      this.settings.tracks[path] = {
+        marker: raw.marker !== undefined ? raw.marker : raw.startPoint ?? firstMarker ?? null,
+        loopA: raw.loopA ?? null,
+        loopB: raw.loopB ?? null,
+        plays: typeof raw.plays === "number" ? raw.plays : 0,
+        playedSec: typeof raw.playedSec === "number" ? raw.playedSec : 0,
+      };
     }
   }
 
@@ -417,7 +425,6 @@ class SongwriterSettingTab extends PluginSettingTab {
       .addSlider(slider => slider
         .setLimits(1, 30, 1)
         .setValue(this.plugin.settings.skipSeconds)
-        .setDynamicTooltip()
         .onChange(async (value) => {
           this.plugin.settings.skipSeconds = value;
           this.plugin.refreshViews();
@@ -442,7 +449,6 @@ class SongwriterSettingTab extends PluginSettingTab {
       .addSlider(slider => slider
         .setLimits(1, 30, 1)
         .setValue(this.plugin.settings.playCountSec)
-        .setDynamicTooltip()
         .onChange(async (value) => {
           this.plugin.settings.playCountSec = value;
           await this.plugin.saveSettings();
@@ -454,7 +460,6 @@ class SongwriterSettingTab extends PluginSettingTab {
       .addSlider(slider => slider
         .setLimits(300, 1500, 50)
         .setValue(this.plugin.settings.doubleStopMs)
-        .setDynamicTooltip()
         .onChange(async (value) => {
           this.plugin.settings.doubleStopMs = value;
           await this.plugin.saveSettings();
@@ -466,7 +471,6 @@ class SongwriterSettingTab extends PluginSettingTab {
       .addSlider(slider => slider
         .setLimits(60, 220, 10)
         .setValue(this.plugin.settings.waveHeight)
-        .setDynamicTooltip()
         .onChange(async (value) => {
           this.plugin.settings.waveHeight = value;
           this.plugin.refreshViews();

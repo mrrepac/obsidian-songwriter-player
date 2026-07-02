@@ -22,12 +22,13 @@ async function doAnalyze(app: App, file: TFile): Promise<Float32Array | null> {
   let buf: AudioBuffer | null = null;
   try {
     const ab = await app.vault.readBinary(file);
-    const AC: typeof AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    const AC: typeof AudioContext =
+      window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     const ctx = new AC();
     try {
       buf = await ctx.decodeAudioData(ab);
     } finally {
-      ctx.close();
+      void ctx.close();
     }
   } catch (e) {
     console.warn("Songwriter: audio decode failed", e);

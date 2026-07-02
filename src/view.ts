@@ -53,7 +53,9 @@ export class SongwriterView extends ItemView {
       text: t("emptyHint")
     });
     const pickBtn = this.emptyEl.createEl("button", { text: t("pickFromNote") });
-    pickBtn.addEventListener("click", () => this.plugin.loadFromActiveNote(false));
+    pickBtn.addEventListener("click", () => {
+      void this.plugin.loadFromActiveNote(false);
+    });
 
     this.contentRoot = root.createDiv({ cls: "sw-player" });
 
@@ -120,7 +122,9 @@ export class SongwriterView extends ItemView {
     const bar = parent.createDiv({ cls: "sw-transport" });
 
     const toStartBtn = this.transportBtn(bar, "skip-back", t("playFromMarkerTitle"));
-    toStartBtn.addEventListener("click", () => this.engine.playFromMarker());
+    toStartBtn.addEventListener("click", () => {
+      void this.engine.playFromMarker();
+    });
 
     const backBtn = this.transportBtn(bar, "chevrons-left", "");
     backBtn.addClass("sw-seek-back");
@@ -128,7 +132,9 @@ export class SongwriterView extends ItemView {
 
     this.playBtn = this.transportBtn(bar, "play", t("playPauseTitle"));
     this.playBtn.addClass("sw-play-btn");
-    this.playBtn.addEventListener("click", () => this.engine.playPause());
+    this.playBtn.addEventListener("click", () => {
+      void this.engine.playPause();
+    });
 
     const fwdBtn = this.transportBtn(bar, "chevrons-right", "");
     fwdBtn.addClass("sw-seek-fwd");
@@ -174,7 +180,7 @@ export class SongwriterView extends ItemView {
     this.updatePlayButton();
     this.updateTotalTime();
     this.updateCurrentTime();
-    this.wave?.setFile(this.engine.file);
+    void this.wave?.setFile(this.engine.file);
     this.wave?.markDirty();
   }
 
@@ -202,7 +208,7 @@ export class SongwriterView extends ItemView {
       sel.title = t("noteAudiosTitle");
       sel.addEventListener("change", () => {
         const f = this.app.vault.getAbstractFileByPath(sel.value);
-        if (f instanceof TFile) this.engine.load(f, { autoplay: this.engine.playing });
+        if (f instanceof TFile) void this.engine.load(f, { autoplay: this.engine.playing });
       });
     } else {
       const name = this.trackRow.createSpan({
@@ -212,7 +218,9 @@ export class SongwriterView extends ItemView {
       if (file) {
         name.addClass("sw-track-name-link");
         name.title = t("openTrackNoteTitle");
-        name.addEventListener("click", () => this.plugin.openTrackNote());
+        name.addEventListener("click", () => {
+          void this.plugin.openTrackNote();
+        });
       }
     }
 
@@ -228,7 +236,7 @@ export class SongwriterView extends ItemView {
       const extBtn = this.trackRow.createEl("button", { cls: "clickable-icon sw-icon-btn sw-ext-open" });
       setIcon(extBtn, "external-link");
       extBtn.title = EXT_BTN_TITLE;
-      extBtn.addEventListener("click", () => void openExternally(this.app, file));
+      extBtn.addEventListener("click", () => openExternally(this.app, file));
       extBtn.addEventListener("contextmenu", (e) => {
         e.preventDefault();
         revealInExplorer(this.app, file);
@@ -264,7 +272,7 @@ export class SongwriterView extends ItemView {
     });
     const switchBtn = this.pendingRow.createEl("button", { text: t("switchBtn") });
     switchBtn.addEventListener("click", () => {
-      this.engine.load(pending, { autoplay: this.engine.playing });
+      void this.engine.load(pending, { autoplay: this.engine.playing });
     });
     const closeBtn = this.pendingRow.createEl("button", { cls: "clickable-icon sw-icon-btn" });
     setIcon(closeBtn, "x");

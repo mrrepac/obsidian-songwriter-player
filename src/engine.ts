@@ -29,7 +29,8 @@ export class PlayerEngine extends Events {
     this.plugin = plugin;
     this.audio = new Audio();
     this.audio.preload = "metadata";
-    (this.audio as any).preservesPitch = true;
+    // preservesPitch is missing from the TS DOM lib this project targets
+    (this.audio as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
     this.audio.volume = plugin.settings.volume;
     this.audio.addEventListener("play", () => {
       this.updateLoopTimer();

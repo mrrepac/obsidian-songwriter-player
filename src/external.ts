@@ -2,24 +2,24 @@ import { App, Notice, Platform, TFile, setIcon } from "obsidian";
 import type SongwriterPlugin from "./main";
 import { t } from "./i18n";
 
-/** Open the file in the system default application (mobile fallback included). */
-export async function openExternally(app: App, file: TFile): Promise<void> {
-  if (Platform.isDesktopApp) {
+/** Private App APIs that exist at runtime but are missing from obsidian.d.ts. */
+interface AppPrivate extends App {
+  openWithDefaultApp?(path: string): void;
+  showInFolder?(path: string): void;
+}
+
+/** Open the file in the system default application (desktop and mobile). */
+export function openExternally(app: App, file: TFile): void {
+  const priv = app as AppPrivate;
+  if (priv.openWithDefaultApp) {
     try {
-      const fullPath = (app.vault.adapter as any).getFullPath(file.path);
-      const { shell } = require("electron");
-      await shell.openPath(fullPath);
+      priv.openWithDefaultApp(file.path);
       return;
     } catch (e) {
-      console.error("Songwriter: failed to open externally via electron", e);
+      console.error("Songwriter: failed to open externally", e);
     }
   }
-  try {
-    (app as any).openWithDefaultApp(file.path);
-  } catch (e) {
-    console.error("Songwriter: failed to open externally", e);
-    new Notice(t("extOpenFailed"));
-  }
+  new Notice(t("extOpenFailed"));
 }
 
 /** Reveal the file in the system file explorer (desktop only). */
@@ -28,14 +28,16 @@ export function revealInExplorer(app: App, file: TFile): void {
     new Notice(t("desktopOnly"));
     return;
   }
-  try {
-    const fullPath = (app.vault.adapter as any).getFullPath(file.path);
-    const { shell } = require("electron");
-    shell.showItemInFolder(fullPath);
-  } catch (e) {
-    console.error("Songwriter: failed to reveal in explorer", e);
-    new Notice(t("revealFailed"));
+  const priv = app as AppPrivate;
+  if (priv.showInFolder) {
+    try {
+      priv.showInFolder(file.path);
+      return;
+    } catch (e) {
+      console.error("Songwriter: failed to reveal in explorer", e);
+    }
   }
+  new Notice(t("revealFailed"));
 }
 
 export const EXT_BTN_TITLE = t("extBtnTitle");
@@ -48,12 +50,19 @@ export const EXT_BTN_TITLE = t("extBtnTitle");
 export class EmbedAudioButtons {
   private plugin: SongwriterPlugin;
   private observer: MutationObserver | null = null;
+  /** The document we attached to in start() — destroy() must clean the same one. */
+  private docRef: Document | null = null;
 
   constructor(plugin: SongwriterPlugin) {
     this.plugin = plugin;
   }
 
+  private get doc(): Document {
+    return this.docRef ?? activeDocument;
+  }
+
   start() {
+    this.docRef = activeDocument;
     this.applyVisibility();
     this.plugin.app.workspace.onLayoutReady(() => this.scanAll());
     this.observer = new MutationObserver((mutations) => {
@@ -63,21 +72,21 @@ export class EmbedAudioButtons {
           const el = node as HTMLElement;
           if (el.tagName?.toLowerCase() === "audio") {
             this.process(el as HTMLAudioElement);
-          } else if (el.querySelectorAll) {
-            el.querySelectorAll("audio").forEach((a) => this.process(a));
+          } else {
+            el.findAll("audio").forEach((a) => this.process(a as HTMLAudioElement));
           }
         });
       }
     });
-    this.observer.observe(document.body, { childList: true, subtree: true });
+    this.observer.observe(this.doc.body, { childList: true, subtree: true });
   }
 
   applyVisibility() {
-    document.body.classList.toggle("sw-hide-embed-buttons", !this.plugin.settings.embedButtons);
+    this.doc.body.classList.toggle("sw-hide-embed-buttons", !this.plugin.settings.embedButtons);
   }
 
   scanAll() {
-    document.querySelectorAll("audio").forEach((a) => this.process(a));
+    this.doc.body.findAll("audio").forEach((a) => this.process(a as HTMLAudioElement));
   }
 
   private resolveFile(audio: HTMLAudioElement): TFile | null {
@@ -104,7 +113,7 @@ export class EmbedAudioButtons {
       e.preventDefault();
       e.stopPropagation();
       const file = this.resolveFile(audio);
-      if (file) void openExternally(this.plugin.app, file);
+      if (file) openExternally(this.plugin.app, file);
       else new Notice(t("audioNotFound"));
     });
     button.addEventListener("contextmenu", (e) => {
@@ -127,18 +136,19 @@ export class EmbedAudioButtons {
   destroy() {
     this.observer?.disconnect();
     this.observer = null;
-    document.body.classList.remove("sw-hide-embed-buttons");
-    document.querySelectorAll(".sw-ext-wrapper").forEach((wrapper) => {
-      const audio = wrapper.querySelector("audio");
+    this.doc.body.classList.remove("sw-hide-embed-buttons");
+    this.doc.body.findAll(".sw-ext-wrapper").forEach((wrapper) => {
+      const audio = wrapper.find("audio");
       if (audio && wrapper.parentNode) {
         wrapper.parentNode.insertBefore(audio, wrapper);
         audio.removeAttribute("data-sw-ext-processed");
       }
       wrapper.remove();
     });
-    document.querySelectorAll(".sw-ext-btn").forEach((b) => b.remove());
-    document.querySelectorAll("[data-sw-ext-processed]").forEach((a) =>
+    this.doc.body.findAll(".sw-ext-btn").forEach((b) => b.remove());
+    this.doc.body.findAll("[data-sw-ext-processed]").forEach((a) =>
       a.removeAttribute("data-sw-ext-processed")
     );
+    this.docRef = null;
   }
 }

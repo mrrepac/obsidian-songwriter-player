@@ -6,9 +6,9 @@ import { moment } from "obsidian";
  */
 const LANG: "en" | "ru" = (() => {
   try {
-    const loc = String((moment as any).locale?.() || "").toLowerCase();
+    const loc = String(moment.locale() || "").toLowerCase();
     if (loc.split("-")[0] === "ru") return "ru";
-  } catch (e) {
+  } catch {
     /* ignore */
   }
   return "en";

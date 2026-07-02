@@ -54,7 +54,7 @@ export class WaveformRenderer {
     this.resizeObserver.observe(this.wrap);
 
     const loop = () => {
-      this.rafId = requestAnimationFrame(loop);
+      this.rafId = window.requestAnimationFrame(loop);
       const t = this.engine.audio.currentTime;
       if (this.dirty || (this.engine.playing && t !== this.lastDrawnTime)) {
         this.draw();
@@ -63,11 +63,11 @@ export class WaveformRenderer {
       }
       if (this.onTick) this.onTick();
     };
-    this.rafId = requestAnimationFrame(loop);
+    this.rafId = window.requestAnimationFrame(loop);
   }
 
   destroy() {
-    cancelAnimationFrame(this.rafId);
+    window.cancelAnimationFrame(this.rafId);
     this.resizeObserver.disconnect();
   }
 
