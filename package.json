@@ -1,5 +1,5 @@
 {
-  "name": "songwriter",
+  "name": "songwriter-player",
   "version": "1.0.0",
   "description": "Obsidian plugin: advanced sidebar audio player for songwriting.",
   "main": "main.js",

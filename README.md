@@ -1,4 +1,4 @@
-# Songwriter
+# Songwriter Player
 
 An advanced sidebar audio player for songwriting.
 

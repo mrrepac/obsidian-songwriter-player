@@ -34,7 +34,7 @@ export class SongwriterView extends ItemView {
   }
 
   getDisplayText(): string {
-    return "Songwriter";
+    return "Songwriter Player";
   }
 
   getIcon(): string {
