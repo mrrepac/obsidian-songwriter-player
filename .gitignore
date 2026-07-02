@@ -1,0 +1,11 @@
+# Per-user plugin data (markers, loop zones, counters, settings)
+data.json
+
+# Build artifact — built and attached to releases by CI, not committed
+main.js
+
+# Tooling / OS
+node_modules/
+.DS_Store
+Thumbs.db
+*.log

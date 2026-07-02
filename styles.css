@@ -1,0 +1,362 @@
+.sw-root {
+  padding: 4px 2px;
+  user-select: none;
+  container-type: inline-size;
+}
+
+.sw-player {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ---- empty state ---- */
+
+.sw-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 8px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.sw-empty-hint {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+}
+
+/* ---- track row ---- */
+
+.sw-track-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+}
+
+.sw-track-icon {
+  display: flex;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.sw-track-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sw-track-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sw-track-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.sw-track-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.sw-track-name-link {
+  cursor: pointer;
+}
+
+.sw-track-name-link:hover {
+  color: var(--interactive-accent);
+}
+
+.sw-plays {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  font-family: var(--font-monospace);
+  cursor: default;
+}
+
+.sw-ext-open,
+.sw-eject {
+  flex-shrink: 0;
+}
+
+.sw-ext-open svg,
+.sw-eject svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ---- "open externally" buttons next to embedded players in notes ---- */
+
+.sw-ext-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.sw-ext-wrapper audio {
+  flex: 1 1 auto;
+  width: auto;
+  margin: 0;
+}
+
+.sw-ext-btn {
+  flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+body.sw-hide-embed-buttons .sw-ext-btn {
+  display: none;
+}
+
+/* ---- pending switch bar ---- */
+
+.sw-pending {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--radius-s);
+  background: var(--background-modifier-hover);
+  border-left: 2px solid var(--interactive-accent);
+  font-size: var(--font-ui-smaller);
+}
+
+.sw-pending-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- waveform ---- */
+
+.sw-wave-wrap {
+  position: relative;
+}
+
+.sw-wave {
+  position: relative;
+  height: var(--sw-wave-height, 110px);
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  overflow: hidden;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.sw-wave.sw-wave-resize {
+  cursor: ew-resize;
+}
+
+.sw-wave-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.sw-wave-hover-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--text-muted);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.sw-wave-hover-time {
+  position: absolute;
+  top: 4px;
+  transform: translateX(-50%);
+  padding: 1px 5px;
+  border-radius: var(--radius-s);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 10px;
+  font-family: var(--font-monospace);
+  pointer-events: none;
+  box-shadow: var(--shadow-s);
+}
+
+.sw-wave-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  pointer-events: none;
+}
+
+/* ---- controls: time · buttons · volume on one line ---- */
+
+.sw-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0 4px;
+}
+
+.sw-time {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  flex-shrink: 0;
+}
+
+.sw-time-current {
+  color: var(--text-normal);
+  font-weight: 600;
+}
+
+.sw-time-sep,
+.sw-time-total {
+  color: var(--text-muted);
+}
+
+.sw-transport {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0 auto;
+}
+
+.sw-tbtn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease, transform 0.06s ease;
+  flex-shrink: 0;
+}
+
+.sw-tbtn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.sw-tbtn:active {
+  transform: scale(0.92);
+}
+
+.sw-tbtn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sw-play-btn,
+.sw-play-btn:hover {
+  width: 38px;
+  height: 38px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  box-shadow: var(--shadow-s);
+}
+
+.sw-play-btn:hover {
+  background: var(--interactive-accent-hover);
+}
+
+.sw-play-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.sw-flag-btn {
+  color: var(--color-orange, #e0a03c);
+}
+
+.sw-flag-btn:hover {
+  color: var(--color-orange, #e0a03c);
+}
+
+.sw-volume {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+/* narrow panel: drop the total time and shrink the volume slider */
+@container (max-width: 330px) {
+  .sw-time-sep,
+  .sw-time-total {
+    display: none;
+  }
+
+  .sw-volume-slider {
+    width: 42px;
+  }
+}
+
+@container (max-width: 260px) {
+  .sw-volume-icon {
+    display: none;
+  }
+}
+
+.sw-volume-icon {
+  display: flex;
+  color: var(--text-muted);
+}
+
+.sw-volume-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.sw-volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 64px;
+  height: 4px;
+  margin: 0;
+  border-radius: 2px;
+  background: var(--background-modifier-border);
+  cursor: pointer;
+}
+
+.sw-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: none;
+  background: var(--text-muted);
+  transition: background-color 0.12s ease, transform 0.12s ease;
+}
+
+.sw-volume-slider:hover::-webkit-slider-thumb {
+  background: var(--interactive-accent);
+  transform: scale(1.15);
+}
+
