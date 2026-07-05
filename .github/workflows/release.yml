@@ -38,7 +38,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
+          # Use hand-written notes if release-notes/<tag>.md exists, else
+          # auto-generate a changelog from commits since the previous tag.
+          if [ -f "release-notes/$TAG.md" ]; then
+            NOTES=(--notes-file "release-notes/$TAG.md")
+          else
+            NOTES=(--generate-notes)
+          fi
           gh release create "$TAG" \
             --title "$TAG" \
-            --notes "Release $TAG" \
+            "${NOTES[@]}" \
             main.js manifest.json styles.css
