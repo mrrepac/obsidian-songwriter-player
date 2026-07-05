@@ -1,7 +1,7 @@
 {
   "id": "songwriter-player",
   "name": "Songwriter Player",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "minAppVersion": "1.7.2",
   "description": "Advanced sidebar audio player for songwriting: waveform, work marker, A-B loop zone, play counters and hotkeys. Playback survives note scrolling and closing the panel.",
   "author": "mrrepac",

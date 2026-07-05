@@ -127,6 +127,11 @@ export class PlayerEngine extends Events {
 
   // ---- loading ----
 
+  // Bumped on every load/refresh/unload so an in-flight setSrcAwaitMeta() that
+  // resolves late (its metadata event and a newer load's fire on the same
+  // <audio>) can detect it was superseded and bail before touching state.
+  private loadToken = 0;
+
   async load(file: TFile, opts: { autoplay?: boolean } = {}) {
     if (this.file?.path === file.path) {
       this.setPendingSwitch(null);
@@ -134,12 +139,15 @@ export class PlayerEngine extends Events {
       this.trigger("track-changed", this.file);
       return;
     }
+    const token = ++this.loadToken;
     this.file = file;
     this.setPendingSwitch(null);
     this.playFromStartOnce = false;
     this.pendingPlaySec = null;
+    this.unsavedPlayedSec = 0;
     this.plugin.requestSave(); // flush the previous track's listened time
     await this.setSrcAwaitMeta(this.plugin.app.vault.getResourcePath(file));
+    if (token !== this.loadToken) return; // superseded by a newer load/unload
     const start = this.plugin.settings.startFromMarkerOnLoad
       ? (this.peekData()?.marker ?? 0)
       : 0;
@@ -153,9 +161,11 @@ export class PlayerEngine extends Events {
   /** Re-resolve the src (e.g. after file rename) keeping position and state. */
   async refreshSrc() {
     if (!this.file) return;
+    const token = ++this.loadToken;
     const t = this.audio.currentTime;
     const wasPlaying = this.playing;
     await this.setSrcAwaitMeta(this.plugin.app.vault.getResourcePath(this.file));
+    if (token !== this.loadToken) return; // superseded by a newer load/unload
     if (t > 0 && t < this.duration) this.audio.currentTime = t;
     if (wasPlaying) await this.safePlay();
     this.trigger("track-changed", this.file);
@@ -176,6 +186,7 @@ export class PlayerEngine extends Events {
   }
 
   unload() {
+    this.loadToken++; // cancel any in-flight load()
     this.audio.pause();
     this.audio.removeAttribute("src");
     this.audio.load();

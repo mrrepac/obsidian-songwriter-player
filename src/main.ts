@@ -1,6 +1,10 @@
-import { App, MarkdownView, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf } from "obsidian";
+import { App, MarkdownView, Notice, Platform, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf } from "obsidian";
 import { DEFAULT_SETTINGS, SongwriterSettings, TrackData, isAudioPath } from "./types";
 import { t } from "./i18n";
+import { EmbedAudioButtons, openExternally, revealInExplorer } from "./external";
+import { PlayerEngine } from "./engine";
+import { MobileMarkerButton } from "./mobilefab";
+import { SongwriterView, VIEW_TYPE_SONGWRITER } from "./view";
 
 /** Pre-1.0 data.json shapes (startPoint / named markers / BPM-key / rate). */
 interface LegacyTrackData extends Partial<TrackData> {
@@ -13,14 +17,12 @@ interface LegacySettings extends Partial<Omit<SongwriterSettings, "tracks">> {
   startFromPointOnLoad?: boolean;
   rate?: number;
 }
-import { EmbedAudioButtons, openExternally, revealInExplorer } from "./external";
-import { PlayerEngine } from "./engine";
-import { SongwriterView, VIEW_TYPE_SONGWRITER } from "./view";
 
 export default class SongwriterPlugin extends Plugin {
   settings: SongwriterSettings;
   engine: PlayerEngine;
   embedButtons: EmbedAudioButtons;
+  mobileFab: MobileMarkerButton;
   private saveTimer: number | null = null;
 
   async onload() {
@@ -28,6 +30,8 @@ export default class SongwriterPlugin extends Plugin {
     this.engine = new PlayerEngine(this);
     this.embedButtons = new EmbedAudioButtons(this);
     this.embedButtons.start();
+    this.mobileFab = new MobileMarkerButton(this);
+    this.mobileFab.start();
 
     this.registerView(VIEW_TYPE_SONGWRITER, (leaf) => new SongwriterView(leaf, this));
     this.addRibbonIcon("music", t("ribbonOpenPlayer"), () => this.activateView());
@@ -220,6 +224,7 @@ export default class SongwriterPlugin extends Plugin {
     // and the <audio> pause event fires too late (async) to request a save
     void this.saveSettings();
     this.embedButtons.destroy();
+    this.mobileFab.destroy();
     this.engine.destroy();
   }
 
@@ -500,5 +505,31 @@ class SongwriterSettingTab extends PluginSettingTab {
           this.plugin.embedButtons.applyVisibility();
           await this.plugin.saveSettings();
         }));
+
+    if (Platform.isMobile) {
+      new Setting(containerEl)
+        .setName(t("setFabName"))
+        .setDesc(t("setFabDesc"))
+        .addToggle(toggle => toggle
+          .setValue(this.plugin.settings.mobileFab)
+          .onChange(async (value) => {
+            this.plugin.settings.mobileFab = value;
+            this.plugin.mobileFab.applyVisibility();
+            await this.plugin.saveSettings();
+          }));
+
+      new Setting(containerEl)
+        .setName(t("setFabModeName"))
+        .setDesc(t("setFabModeDesc"))
+        .addDropdown(dropdown => dropdown
+          .addOption("marker", t("fabModeMarker"))
+          .addOption("smart", t("fabModeSmart"))
+          .setValue(this.plugin.settings.fabMode)
+          .onChange(async (value) => {
+            this.plugin.settings.fabMode = value as SongwriterSettings["fabMode"];
+            this.plugin.mobileFab.applyVisibility(); // refresh the icon
+            await this.plugin.saveSettings();
+          }));
+    }
   }
 }

@@ -364,3 +364,40 @@ body.sw-hide-embed-buttons .sw-ext-btn {
   transform: scale(1.15);
 }
 
+
+/* ---- mobile floating "play from marker" button ---- */
+
+.sw-fab {
+  position: fixed;
+  right: 18px;
+  /* top-right, just below the note header so it never covers the header
+     buttons and the keyboard at the bottom can never swallow it */
+  top: calc(env(safe-area-inset-top, 0px) + 64px);
+  /* above the note, but below modals/menus so it can't cover Settings */
+  z-index: var(--layer-popover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  color: var(--text-on-accent);
+  background-color: var(--interactive-accent);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: transform 0.08s ease, background-color 0.15s ease;
+}
+
+.sw-fab:active {
+  transform: scale(0.92);
+  background-color: var(--interactive-accent-hover);
+}
+
+.sw-fab svg {
+  width: 24px;
+  height: 24px;
+}

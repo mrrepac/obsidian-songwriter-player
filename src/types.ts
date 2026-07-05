@@ -20,6 +20,9 @@ export function emptyTrackData(): TrackData {
 
 export type PickupMode = "hybrid" | "auto" | "manual";
 
+/** Mobile floating-button tap behavior. */
+export type FabMode = "marker" | "smart";
+
 export interface SongwriterSettings {
   pickupMode: PickupMode;
   skipSeconds: number;
@@ -29,6 +32,8 @@ export interface SongwriterSettings {
   doubleStopMs: number;
   waveHeight: number;
   embedButtons: boolean;
+  mobileFab: boolean;
+  fabMode: FabMode;
   tracks: Record<string, TrackData>;
 }
 
@@ -41,6 +46,8 @@ export const DEFAULT_SETTINGS: SongwriterSettings = {
   doubleStopMs: 600,
   waveHeight: 110,
   embedButtons: true,
+  mobileFab: true,
+  fabMode: "marker",
   tracks: {}
 };
 

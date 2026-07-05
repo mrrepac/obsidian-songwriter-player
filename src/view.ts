@@ -162,13 +162,6 @@ export class SongwriterView extends ItemView {
     if (fwd) fwd.title = t("seekFwdTitle")(s);
   }
 
-  private iconBtn(parent: HTMLElement, icon: string, title: string): HTMLButtonElement {
-    const btn = parent.createEl("button", { cls: "clickable-icon sw-icon-btn" });
-    setIcon(btn, icon);
-    if (title) btn.title = title;
-    return btn;
-  }
-
   // ---- renders ----
 
   private renderAll() {

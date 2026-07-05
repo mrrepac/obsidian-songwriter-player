@@ -34,6 +34,7 @@ const en = {
   // ribbon & buttons
   ribbonOpenPlayer: "Songwriter: open player",
   extBtnTitle: "Open in external player · right-click — reveal in explorer",
+  fabTitle: "Play from marker",
 
   // player panel
   emptyTitle: "No track loaded.",
@@ -81,6 +82,14 @@ const en = {
   setEmbedBtnName: "Button on embedded players",
   setEmbedBtnDesc:
     "Show an “open externally” button next to every audio player in notes (ported from Open Audio Externally).",
+  setFabName: "Floating play button (mobile)",
+  setFabDesc:
+    "Show a round button over the note on mobile: tap plays from the marker (or the start). No need to swipe to the sidebar player.",
+  setFabModeName: "Floating button tap",
+  setFabModeDesc:
+    "From marker: every tap (re)starts from the marker. Smart: tap plays from the marker while paused, pauses while playing.",
+  fabModeMarker: "Always from marker",
+  fabModeSmart: "Smart play/pause",
 };
 
 const ru: typeof en = {
@@ -101,6 +110,7 @@ const ru: typeof en = {
 
   ribbonOpenPlayer: "Songwriter: открыть плеер",
   extBtnTitle: "Открыть во внешнем плеере · правый клик — проводник",
+  fabTitle: "Играть с маркера",
 
   emptyTitle: "Трек не загружен.",
   emptyHint: "Откройте заметку со ссылкой на аудиофайл — плеер подхватит его сам.",
@@ -145,6 +155,14 @@ const ru: typeof en = {
   setEmbedBtnName: "Кнопка у встроенных плееров",
   setEmbedBtnDesc:
     "Показывать кнопку «открыть внешне» рядом с каждым аудиоплеером в заметках (перенесено из Open Audio Externally).",
+  setFabName: "Плавающая кнопка (мобайл)",
+  setFabDesc:
+    "Показывать круглую кнопку поверх заметки на телефоне: тап — играть с маркера (или с начала). Не нужно свайпать к панели плеера.",
+  setFabModeName: "Действие по тапу",
+  setFabModeDesc:
+    "С маркера: каждый тап запускает бит с маркера заново. Умный: на паузе играет с маркера, во время игры ставит паузу.",
+  fabModeMarker: "Всегда с маркера",
+  fabModeSmart: "Умный плей/пауза",
 };
 
 const STRINGS = { en, ru };

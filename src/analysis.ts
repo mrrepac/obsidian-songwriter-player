@@ -13,9 +13,15 @@ const cache = new Map<string, CacheEntry>();
 export function analyzePeaks(app: App, file: TFile): Promise<Float32Array | null> {
   const hit = cache.get(file.path);
   if (hit && hit.mtime === file.stat.mtime) return hit.promise;
-  const promise = doAnalyze(app, file);
-  cache.set(file.path, { mtime: file.stat.mtime, promise });
-  return promise;
+  const entry: CacheEntry = { mtime: file.stat.mtime, promise: doAnalyze(app, file) };
+  cache.set(file.path, entry);
+  // A transient decode failure (file briefly locked, read interrupted) must not
+  // poison the cache: drop the entry on null so a later request retries instead
+  // of returning null forever. Guard against clobbering a newer entry.
+  void entry.promise.then((peaks) => {
+    if (peaks === null && cache.get(file.path) === entry) cache.delete(file.path);
+  });
+  return entry.promise;
 }
 
 async function doAnalyze(app: App, file: TFile): Promise<Float32Array | null> {

@@ -56,12 +56,15 @@ export class WaveformRenderer {
     const loop = () => {
       this.rafId = window.requestAnimationFrame(loop);
       const t = this.engine.audio.currentTime;
-      if (this.dirty || (this.engine.playing && t !== this.lastDrawnTime)) {
+      // redraw on any position change (playing OR a paused seek) or a dirty
+      // flag; skip work entirely when idle. onTick rides along so the time
+      // readout tracks the playhead without a separate 60fps drumbeat.
+      if (this.dirty || t !== this.lastDrawnTime) {
         this.draw();
         this.lastDrawnTime = t;
         this.dirty = false;
+        this.onTick?.();
       }
-      if (this.onTick) this.onTick();
     };
     this.rafId = window.requestAnimationFrame(loop);
   }
@@ -179,9 +182,8 @@ export class WaveformRenderer {
 
     this.wrap.addEventListener("pointerup", (e) => {
       if (this.wrap.hasPointerCapture(e.pointerId)) this.wrap.releasePointerCapture(e.pointerId);
-      if (mode === "select" && this.dragZone) {
-        this.engine.setLoopZone(this.dragZone.a, this.dragZone.b);
-      } else if ((mode === "resize-a" || mode === "resize-b") && this.dragZone) {
+      const dragged = mode === "select" || mode === "resize-a" || mode === "resize-b";
+      if (dragged && this.dragZone) {
         this.engine.setLoopZone(this.dragZone.a, this.dragZone.b);
       } else if (mode === "maybe-click") {
         void this.engine.playAt(downTime);
