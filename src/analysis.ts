@@ -2,15 +2,22 @@ import { App, TFile } from "obsidian";
 
 export const WAVE_BINS = 2000;
 
+/** Peaks plus the decoded duration — the latter lets an inline waveform place
+ *  its marker/loop and map clicks even while its file is not the active track. */
+export interface WaveData {
+  peaks: Float32Array;
+  duration: number;
+}
+
 interface CacheEntry {
   mtime: number;
-  promise: Promise<Float32Array | null>;
+  promise: Promise<WaveData | null>;
 }
 
 const cache = new Map<string, CacheEntry>();
 
 /** Decode a file once and compute waveform peaks. Cached by path+mtime. */
-export function analyzePeaks(app: App, file: TFile): Promise<Float32Array | null> {
+export function analyzeAudio(app: App, file: TFile): Promise<WaveData | null> {
   const hit = cache.get(file.path);
   if (hit && hit.mtime === file.stat.mtime) return hit.promise;
   const entry: CacheEntry = { mtime: file.stat.mtime, promise: doAnalyze(app, file) };
@@ -18,13 +25,13 @@ export function analyzePeaks(app: App, file: TFile): Promise<Float32Array | null
   // A transient decode failure (file briefly locked, read interrupted) must not
   // poison the cache: drop the entry on null so a later request retries instead
   // of returning null forever. Guard against clobbering a newer entry.
-  void entry.promise.then((peaks) => {
-    if (peaks === null && cache.get(file.path) === entry) cache.delete(file.path);
+  void entry.promise.then((data) => {
+    if (data === null && cache.get(file.path) === entry) cache.delete(file.path);
   });
   return entry.promise;
 }
 
-async function doAnalyze(app: App, file: TFile): Promise<Float32Array | null> {
+async function doAnalyze(app: App, file: TFile): Promise<WaveData | null> {
   let buf: AudioBuffer | null = null;
   try {
     const ab = await app.vault.readBinary(file);
@@ -40,7 +47,7 @@ async function doAnalyze(app: App, file: TFile): Promise<Float32Array | null> {
     console.warn("Songwriter: audio decode failed", e);
   }
   if (!buf) return null;
-  return computePeaks(buf);
+  return { peaks: computePeaks(buf), duration: buf.duration };
 }
 
 function computePeaks(buf: AudioBuffer): Float32Array {

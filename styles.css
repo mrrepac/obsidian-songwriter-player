@@ -125,6 +125,127 @@ body.sw-hide-embed-buttons .sw-ext-btn {
   display: none;
 }
 
+/* ---- inline waveform players (replacing native <audio> in notes) ---- */
+
+.sw-embed {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0;
+  padding: 6px 10px 8px;
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  border: 1px solid transparent;
+  user-select: none;
+}
+
+.sw-embed.is-active {
+  border-color: var(--interactive-accent);
+}
+
+.sw-embed-native-hidden {
+  display: none !important;
+}
+
+.sw-embed-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sw-embed-wave {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+/* reuses the sidebar .sw-wave visuals, but shorter, and lets vertical page
+   scroll pass through — only horizontal drags select an A-B zone */
+.sw-embed-wave .sw-wave {
+  height: var(--sw-embed-wave-height, 56px);
+  border-radius: var(--radius-s);
+  touch-action: pan-y;
+  cursor: pointer;
+}
+
+.sw-embed.is-active .sw-embed-wave .sw-wave {
+  cursor: crosshair;
+}
+
+.sw-embed.is-active .sw-embed-wave .sw-wave.sw-wave-resize {
+  cursor: ew-resize;
+}
+
+.sw-embed-play {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  box-shadow: var(--shadow-s);
+  cursor: pointer;
+  transition: background-color 0.12s ease, transform 0.06s ease;
+}
+
+.sw-embed-play:hover {
+  background: var(--interactive-accent-hover);
+}
+
+.sw-embed-play:active {
+  transform: scale(0.92);
+}
+
+.sw-embed-play svg {
+  width: 18px;
+  height: 18px;
+}
+
+.sw-embed-ext {
+  flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: var(--text-muted);
+}
+
+.sw-embed-ext svg {
+  width: 15px;
+  height: 15px;
+}
+
+body.sw-hide-embed-buttons .sw-embed-ext {
+  display: none;
+}
+
+.sw-embed-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0 2px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.sw-embed-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sw-embed-time {
+  flex: 0 0 auto;
+  font-family: var(--font-monospace);
+  color: var(--text-faint);
+}
+
 /* ---- pending switch bar ---- */
 
 .sw-pending {

@@ -1,8 +1,8 @@
 import { TFile } from "obsidian";
 import type SongwriterPlugin from "./main";
 import { PlayerEngine } from "./engine";
-import { analyzePeaks, WAVE_BINS as BINS } from "./analysis";
-import { formatTime } from "./types";
+import { analyzeAudio, WAVE_BINS as BINS } from "./analysis";
+import { TrackData, formatTime } from "./types";
 import { t } from "./i18n";
 
 /**
@@ -10,10 +10,19 @@ import { t } from "./i18n";
  * select or resize the A-B loop zone. Peaks come from the shared analysis
  * module (one decode per file); playback itself goes through the engine's
  * <audio>, not Web Audio.
+ *
+ * Two roles:
+ *  - the sidebar renderer *follows the engine*: it always shows whatever track
+ *    is loaded and is always "active" (full interaction, live playhead);
+ *  - an inline (`bound`) renderer is pinned to one file. It draws that file's
+ *    peaks, marker and zone from saved data, but only reflects the engine's
+ *    playhead while its file is the loaded track. When it is not, a tap asks
+ *    the host to make it the active track (`onActivate`).
  */
 export class WaveformRenderer {
   private plugin: SongwriterPlugin;
   private engine: PlayerEngine;
+  private bound: boolean;
   private wrap: HTMLElement;
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -21,9 +30,12 @@ export class WaveformRenderer {
   private hoverTime: HTMLElement;
   private loadingEl: HTMLElement;
 
+  private shownFile: TFile | null = null;
+  private fileDuration = 0;
   private peaks: Float32Array | null = null;
   private decodeToken = 0;
   private rafId = 0;
+  private pendingDraw = 0;
   private dirty = true;
   private lastDrawnTime = -1;
   private resizeObserver: ResizeObserver;
@@ -31,10 +43,14 @@ export class WaveformRenderer {
   private colors = { base: "#888", played: "#7aa2f7", cursor: "#7aa2f7", marker: "#e0a03c" };
 
   onTick: (() => void) | null = null;
+  /** Bound renderers only: called with the clicked time when the user taps an
+   *  inactive waveform, asking the host to load this file and play from there. */
+  onActivate: ((time: number) => void) | null = null;
 
-  constructor(plugin: SongwriterPlugin, engine: PlayerEngine, container: HTMLElement) {
+  constructor(plugin: SongwriterPlugin, engine: PlayerEngine, container: HTMLElement, bound = false) {
     this.plugin = plugin;
     this.engine = engine;
+    this.bound = bound;
 
     this.wrap = container.createDiv({ cls: "sw-wave" });
     this.canvas = this.wrap.createEl("canvas", { cls: "sw-wave-canvas" });
@@ -53,29 +69,111 @@ export class WaveformRenderer {
     this.resizeObserver = new ResizeObserver(() => this.markDirty());
     this.resizeObserver.observe(this.wrap);
 
-    const loop = () => {
-      this.rafId = window.requestAnimationFrame(loop);
-      const t = this.engine.audio.currentTime;
-      // redraw on any position change (playing OR a paused seek) or a dirty
-      // flag; skip work entirely when idle. onTick rides along so the time
-      // readout tracks the playhead without a separate 60fps drumbeat.
-      if (this.dirty || t !== this.lastDrawnTime) {
-        this.draw();
-        this.lastDrawnTime = t;
-        this.dirty = false;
-        this.onTick?.();
-      }
-    };
-    this.rafId = window.requestAnimationFrame(loop);
+    this.startLoopIfActive();
   }
 
   destroy() {
-    window.cancelAnimationFrame(this.rafId);
+    if (this.rafId) window.cancelAnimationFrame(this.rafId);
+    if (this.pendingDraw) window.cancelAnimationFrame(this.pendingDraw);
+    this.rafId = 0;
+    this.pendingDraw = 0;
     this.resizeObserver.disconnect();
   }
 
+  // ---- active state & duration ----
+  // A bound renderer is "active" only while its file is the loaded track; the
+  // sidebar renderer (bound === false) always follows the engine.
+
+  private get active(): boolean {
+    if (!this.bound) return true;
+    const f = this.shownFile;
+    return !!f && this.engine.file?.path === f.path;
+  }
+
+  /** Something to draw at all (peaks may still be decoding). */
+  private get hasContent(): boolean {
+    return this.bound ? !!this.shownFile : !!this.engine.file;
+  }
+
+  /** Duration to map x⇄time against: the engine's when active, the file's own
+   *  decoded duration when this bound waveform is not the loaded track. */
+  private get dur(): number {
+    return this.active ? this.engine.duration : this.fileDuration;
+  }
+
+  /** Duration currently used for layout: the engine's while active, the file's
+   *  own decoded duration otherwise. Lets the host show a total for a track
+   *  that is not loaded yet. 0 until known. */
+  get shownDuration(): number {
+    return this.dur;
+  }
+
+  /** Whether this waveform's file is the loaded track right now. */
+  get isActive(): boolean {
+    return this.active;
+  }
+
+  private trackData(): TrackData | null {
+    const path = this.bound ? this.shownFile?.path : this.engine.file?.path;
+    return path ? this.plugin.settings.tracks[path] ?? null : null;
+  }
+
+  private get shownLoop(): { a: number; b: number } | null {
+    if (this.active) return this.engine.loop;
+    const d = this.trackData();
+    if (!d || d.loopA === null || d.loopB === null) return null;
+    return { a: d.loopA, b: d.loopB };
+  }
+
+  /** Host hook (bound renderers): re-evaluate active state when the loaded
+   *  track changes — start/stop the animation loop and repaint the playhead. */
+  refreshActive() {
+    this.startLoopIfActive();
+    this.markDirty();
+  }
+
+  // ---- animation ----
+  // The permanent rAF runs only while this renderer is active (playhead can
+  // move). Parked/inactive renderers repaint on demand via a one-shot frame,
+  // so a note full of inline waveforms costs almost nothing when idle.
+
+  private startLoopIfActive() {
+    if (this.active) {
+      if (this.rafId === 0) this.rafId = window.requestAnimationFrame(this.loop);
+    } else if (this.rafId !== 0) {
+      window.cancelAnimationFrame(this.rafId);
+      this.rafId = 0;
+    }
+  }
+
+  private loop = () => {
+    this.rafId = window.requestAnimationFrame(this.loop);
+    const now = this.engine.audio.currentTime;
+    // redraw on any position change (playing OR a paused seek) or a dirty
+    // flag; skip work entirely when idle. onTick rides along so the time
+    // readout tracks the playhead without a separate 60fps drumbeat.
+    if (this.dirty || now !== this.lastDrawnTime) {
+      this.draw();
+      this.lastDrawnTime = now;
+      this.dirty = false;
+      this.onTick?.();
+    }
+  };
+
   markDirty() {
     this.dirty = true;
+    // parked (inactive) renderer: no permanent loop is running, so schedule a
+    // single frame to repaint the static waveform.
+    if (this.rafId === 0 && this.pendingDraw === 0) {
+      this.pendingDraw = window.requestAnimationFrame(() => {
+        this.pendingDraw = 0;
+        if (this.dirty) {
+          this.draw();
+          this.dirty = false;
+          this.onTick?.();
+        }
+      });
+    }
   }
 
   refreshColors() {
@@ -93,20 +191,24 @@ export class WaveformRenderer {
 
   async setFile(file: TFile | null) {
     const token = ++this.decodeToken;
+    this.shownFile = file;
     this.peaks = null;
+    this.fileDuration = 0;
     this.loadingEl.hide();
+    this.startLoopIfActive();
     this.markDirty();
     if (!file) return;
 
     this.loadingEl.show();
-    let peaks: Float32Array | null = null;
+    let data: Awaited<ReturnType<typeof analyzeAudio>> = null;
     try {
-      peaks = await analyzePeaks(this.plugin.app, file);
+      data = await analyzeAudio(this.plugin.app, file);
     } catch (e) {
       console.warn("Songwriter: waveform decode failed", e);
     }
     if (token !== this.decodeToken) return; // another track was loaded meanwhile
-    this.peaks = peaks;
+    this.peaks = data?.peaks ?? null;
+    this.fileDuration = data?.duration ?? 0;
     this.loadingEl.hide();
     this.markDirty();
   }
@@ -114,6 +216,7 @@ export class WaveformRenderer {
   // ---- interaction ----
   // single click: play from there · double click: set marker
   // drag on empty space: select an A-B loop zone · drag a zone edge: resize it
+  // an inactive bound waveform ignores all of this — a tap just activates it.
 
   private bindPointer() {
     const DRAG_THRESHOLD_PX = 5;
@@ -127,13 +230,13 @@ export class WaveformRenderer {
     const timeAtX = (clientX: number): number => {
       const rect = this.wrap.getBoundingClientRect();
       const x = Math.min(Math.max(clientX - rect.left, 0), rect.width);
-      const d = this.engine.duration;
+      const d = this.dur;
       return rect.width > 0 ? (x / rect.width) * d : 0;
     };
 
     const edgeAt = (clientX: number): "a" | "b" | null => {
       const lp = this.engine.loop;
-      const d = this.engine.duration;
+      const d = this.dur;
       if (!lp || d <= 0) return null;
       const rect = this.wrap.getBoundingClientRect();
       if (rect.width === 0) return null;
@@ -145,8 +248,15 @@ export class WaveformRenderer {
       return null;
     };
 
+    // Inactive bound waveform: a plain click activates it (and plays from the
+    // clicked position). The pointer-drag machinery below stays disarmed.
+    this.wrap.addEventListener("click", (e) => {
+      if (this.active || !this.hasContent) return;
+      this.onActivate?.(timeAtX(e.clientX));
+    });
+
     this.wrap.addEventListener("pointerdown", (e) => {
-      if (!this.engine.file || e.button !== 0) return;
+      if (!this.active || !this.engine.file || e.button !== 0) return;
       const edge = edgeAt(e.clientX);
       const lp = this.engine.loop;
       if (edge && lp) {
@@ -165,8 +275,8 @@ export class WaveformRenderer {
         mode = "select";
       }
       if (mode === "select") {
-        const t = timeAtX(e.clientX);
-        this.dragZone = { a: Math.min(downTime, t), b: Math.max(downTime, t) };
+        const now = timeAtX(e.clientX);
+        this.dragZone = { a: Math.min(downTime, now), b: Math.max(downTime, now) };
         this.markDirty();
       } else if (mode === "resize-a" && this.dragZone) {
         this.dragZone.a = Math.max(0, Math.min(timeAtX(e.clientX), this.dragZone.b - MIN_ZONE_SEC));
@@ -174,7 +284,7 @@ export class WaveformRenderer {
       } else if (mode === "resize-b" && this.dragZone) {
         this.dragZone.b = Math.max(timeAtX(e.clientX), this.dragZone.a + MIN_ZONE_SEC);
         this.markDirty();
-      } else if (mode === "idle") {
+      } else if (mode === "idle" && this.active) {
         this.wrap.toggleClass("sw-wave-resize", edgeAt(e.clientX) !== null);
       }
       this.showHover(e);
@@ -200,20 +310,20 @@ export class WaveformRenderer {
     });
 
     this.wrap.addEventListener("dblclick", (e) => {
-      if (!this.engine.file) return;
+      if (!this.active || !this.engine.file) return;
       this.engine.setMarkerAt(timeAtX(e.clientX));
     });
     this.wrap.addEventListener("pointerleave", () => this.hideHover());
   }
 
   private showHover(e: PointerEvent) {
-    if (!this.engine.file) {
+    const d = this.dur;
+    if (!this.hasContent || d <= 0) {
       this.hideHover();
       return;
     }
     const rect = this.wrap.getBoundingClientRect();
     const x = Math.min(Math.max(e.clientX - rect.left, 0), rect.width);
-    const d = this.engine.duration;
     this.hoverLine.show();
     this.hoverTime.show();
     this.hoverLine.style.left = `${x}px`;
@@ -243,10 +353,11 @@ export class WaveformRenderer {
     }
     const ctx = this.ctx;
     ctx.clearRect(0, 0, W, H);
-    if (!this.engine.file) return;
+    if (!this.hasContent) return;
 
-    const d = this.engine.duration;
-    const progress = d > 0 ? this.engine.audio.currentTime / d : 0;
+    const d = this.dur;
+    // playhead/played colouring only when this waveform is the live track
+    const progress = this.active && d > 0 ? this.engine.audio.currentTime / d : 0;
     const progressX = progress * W;
 
     // waveform columns
@@ -268,16 +379,15 @@ export class WaveformRenderer {
       }
       const h = Math.max(1 * dpr, amp * maxAmp);
       const x = i * stepX;
-      ctx.fillStyle = x + colW <= progressX ? this.colors.played : this.colors.base;
-      ctx.globalAlpha = x + colW <= progressX ? 1 : 0.55;
+      const played = this.active && x + colW <= progressX;
+      ctx.fillStyle = played ? this.colors.played : this.colors.base;
+      ctx.globalAlpha = played ? 1 : 0.55;
       ctx.fillRect(x, mid - h, colW, h * 2);
     }
     ctx.globalAlpha = 1;
 
-    // A-B loop zone (saved or being dragged right now)
-    const data = this.engine.peekData();
-    const savedLoop = this.engine.loop;
-    const zone = this.dragZone ?? savedLoop;
+    // A-B loop zone (saved, or being dragged right now)
+    const zone = this.dragZone ?? this.shownLoop;
     if (zone && d > 0) {
       const x1 = (zone.a / d) * W;
       const x2 = (zone.b / d) * W;
@@ -291,6 +401,7 @@ export class WaveformRenderer {
     }
 
     // marker flag
+    const data = this.trackData();
     if (data && data.marker !== null && d > 0) {
       const x = Math.round((data.marker / d) * W);
       ctx.fillStyle = this.colors.marker;
@@ -303,8 +414,10 @@ export class WaveformRenderer {
       ctx.fill();
     }
 
-    // playhead
-    ctx.fillStyle = this.colors.cursor;
-    ctx.fillRect(Math.round(progressX), 0, Math.max(1, dpr), H);
+    // playhead (live track only)
+    if (this.active) {
+      ctx.fillStyle = this.colors.cursor;
+      ctx.fillRect(Math.round(progressX), 0, Math.max(1, dpr), H);
+    }
   }
 }

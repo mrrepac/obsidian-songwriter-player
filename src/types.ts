@@ -31,6 +31,7 @@ export interface SongwriterSettings {
   playCountSec: number;
   doubleStopMs: number;
   waveHeight: number;
+  inlinePlayers: boolean;
   embedButtons: boolean;
   mobileFab: boolean;
   fabMode: FabMode;
@@ -45,6 +46,7 @@ export const DEFAULT_SETTINGS: SongwriterSettings = {
   playCountSec: 5,
   doubleStopMs: 600,
   waveHeight: 110,
+  inlinePlayers: true,
   embedButtons: true,
   mobileFab: true,
   fabMode: "marker",

@@ -1,7 +1,8 @@
 import { App, MarkdownView, Notice, Platform, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf } from "obsidian";
 import { DEFAULT_SETTINGS, SongwriterSettings, TrackData, isAudioPath } from "./types";
 import { t } from "./i18n";
-import { EmbedAudioButtons, openExternally, revealInExplorer } from "./external";
+import { openExternally, revealInExplorer } from "./external";
+import { EmbedPlayers } from "./embed";
 import { PlayerEngine } from "./engine";
 import { MobileMarkerButton } from "./mobilefab";
 import { SongwriterView, VIEW_TYPE_SONGWRITER } from "./view";
@@ -21,15 +22,15 @@ interface LegacySettings extends Partial<Omit<SongwriterSettings, "tracks">> {
 export default class SongwriterPlugin extends Plugin {
   settings: SongwriterSettings;
   engine: PlayerEngine;
-  embedButtons: EmbedAudioButtons;
+  embeds: EmbedPlayers;
   mobileFab: MobileMarkerButton;
   private saveTimer: number | null = null;
 
   async onload() {
     await this.loadSettings();
     this.engine = new PlayerEngine(this);
-    this.embedButtons = new EmbedAudioButtons(this);
-    this.embedButtons.start();
+    this.embeds = new EmbedPlayers(this);
+    this.embeds.start();
     this.mobileFab = new MobileMarkerButton(this);
     this.mobileFab.start();
 
@@ -223,7 +224,7 @@ export default class SongwriterPlugin extends Plugin {
     // always flush: listened time may be accumulated without a pending timer,
     // and the <audio> pause event fires too late (async) to request a save
     void this.saveSettings();
-    this.embedButtons.destroy();
+    this.embeds.destroy();
     this.mobileFab.destroy();
     this.engine.destroy();
   }
@@ -496,13 +497,24 @@ class SongwriterSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
+      .setName(t("setInlineName"))
+      .setDesc(t("setInlineDesc"))
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.inlinePlayers)
+        .onChange(async (value) => {
+          this.plugin.settings.inlinePlayers = value;
+          this.plugin.embeds.applyMode();
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
       .setName(t("setEmbedBtnName"))
       .setDesc(t("setEmbedBtnDesc"))
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.embedButtons)
         .onChange(async (value) => {
           this.plugin.settings.embedButtons = value;
-          this.plugin.embedButtons.applyVisibility();
+          this.plugin.embeds.applyVisibility();
           await this.plugin.saveSettings();
         }));
 

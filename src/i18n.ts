@@ -79,9 +79,12 @@ const en = {
   setDoubleStopDesc: "How many milliseconds between two Stop presses count as a double press (rewind to the start).",
   setWaveHName: "Waveform height",
   setWaveHDesc: "Height of the visible waveform, in pixels.",
-  setEmbedBtnName: "Button on embedded players",
+  setInlineName: "Waveform players in notes",
+  setInlineDesc:
+    "Replace the plain embedded audio players in notes with a waveform wired to this player: click to play, drag for an A-B zone, double-click to set the marker. One track plays at a time, shared with the sidebar.",
+  setEmbedBtnName: "“Open externally” button",
   setEmbedBtnDesc:
-    "Show an “open externally” button next to every audio player in notes (ported from Open Audio Externally).",
+    "Show an “open externally” button on audio players in notes (right-click reveals the file in the system explorer). Applies to both the waveform and the plain player.",
   setFabName: "Floating play button (mobile)",
   setFabDesc:
     "Show a round button over the note on mobile: tap plays from the marker (or the start). No need to swipe to the sidebar player.",
@@ -152,9 +155,12 @@ const ru: typeof en = {
   setDoubleStopDesc: "За сколько миллисекунд два нажатия «стоп» считаются двойным (перемотка в начало).",
   setWaveHName: "Высота волны",
   setWaveHDesc: "Высота видимой волны трека в пикселях.",
-  setEmbedBtnName: "Кнопка у встроенных плееров",
+  setInlineName: "Волна вместо плеера в заметках",
+  setInlineDesc:
+    "Заменять штатные встроенные аудиоплееры в заметках волной, привязанной к этому плееру: клик — играть, протяжка — зона A-B, двойной клик — маркер. Играет одна дорожка за раз, общая с панелью.",
+  setEmbedBtnName: "Кнопка «открыть внешне»",
   setEmbedBtnDesc:
-    "Показывать кнопку «открыть внешне» рядом с каждым аудиоплеером в заметках (перенесено из Open Audio Externally).",
+    "Показывать кнопку «открыть внешне» у аудиоплееров в заметках (правый клик — показать файл в проводнике). Работает и для волны, и для штатного плеера.",
   setFabName: "Плавающая кнопка (мобайл)",
   setFabDesc:
     "Показывать круглую кнопку поверх заметки на телефоне: тап — играть с маркера (или с начала). Не нужно свайпать к панели плеера.",
