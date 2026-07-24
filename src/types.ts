@@ -23,6 +23,13 @@ export type PickupMode = "hybrid" | "auto" | "manual";
 /** Mobile floating-button tap behavior. */
 export type FabMode = "marker" | "smart";
 
+/** Where the current playlist came from — shown as the playlist heading. */
+export interface QueueSource {
+  kind: "note" | "folder";
+  name: string;
+  path: string;
+}
+
 export interface SongwriterSettings {
   pickupMode: PickupMode;
   skipSeconds: number;
@@ -35,6 +42,9 @@ export interface SongwriterSettings {
   embedButtons: boolean;
   mobileFab: boolean;
   fabMode: FabMode;
+  folderQueue: boolean;
+  autoAdvance: boolean;
+  playlistCollapsed: boolean;
   tracks: Record<string, TrackData>;
 }
 
@@ -50,6 +60,9 @@ export const DEFAULT_SETTINGS: SongwriterSettings = {
   embedButtons: true,
   mobileFab: true,
   fabMode: "marker",
+  folderQueue: true,
+  autoAdvance: false,
+  playlistCollapsed: false,
   tracks: {}
 };
 

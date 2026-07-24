@@ -15,10 +15,19 @@ export class SongwriterView extends ItemView {
 
   private trackRow: HTMLElement;
   private pendingRow: HTMLElement;
+  private playlistEl: HTMLElement;
+  private playlistList: HTMLElement;
+  private playlistIcon: HTMLElement;
+  private playlistTitle: HTMLElement;
+  private playlistCount: HTMLElement;
+  private playlistChevron: HTMLElement;
+  private playlistRows = new Map<string, { flag: HTMLElement; plays: HTMLElement }>();
   private waveWrap: HTMLElement;
   private timeCurrent: HTMLElement;
   private timeTotal: HTMLElement;
   private playBtn: HTMLButtonElement;
+  private prevBtn: HTMLButtonElement;
+  private nextBtn: HTMLButtonElement;
   private playsEl: HTMLElement | null = null;
   private emptyEl: HTMLElement;
   private contentRoot: HTMLElement;
@@ -91,14 +100,22 @@ export class SongwriterView extends ItemView {
     vol.title = t("volume");
     vol.addEventListener("input", () => this.engine.setVolume(parseFloat(vol.value)));
 
+    // the playlist lives outside the player block, so it stays reachable
+    // after the track is ejected — pick the next one right from the list
+    this.buildPlaylist(root);
+
     // engine → UI
     this.registerEvent(this.engine.on("track-changed", () => this.renderAll()));
     this.registerEvent(this.engine.on("play-state", () => this.updatePlayButton()));
     this.registerEvent(this.engine.on("data-changed", () => {
       this.updatePlays();
+      this.updatePlaylistRow();
       this.wave?.markDirty();
     }));
-    this.registerEvent(this.engine.on("note-audios", () => this.renderTrackRow()));
+    this.registerEvent(this.engine.on("queue-changed", () => {
+      this.renderTrackRow();
+      this.renderPlaylist();
+    }));
     this.registerEvent(this.engine.on("pending-switch", () => this.renderPending()));
     this.registerEvent(this.app.workspace.on("css-change", () => this.wave?.refreshColors()));
 
@@ -120,6 +137,12 @@ export class SongwriterView extends ItemView {
 
   private buildTransport(parent: HTMLElement) {
     const bar = parent.createDiv({ cls: "sw-transport" });
+
+    this.prevBtn = this.transportBtn(bar, "step-back", t("prevTrackTitle"));
+    this.prevBtn.addClass("sw-queue-btn");
+    this.prevBtn.addEventListener("click", () => {
+      void this.engine.step(-1);
+    });
 
     const toStartBtn = this.transportBtn(bar, "skip-back", t("playFromMarkerTitle"));
     toStartBtn.addEventListener("click", () => {
@@ -144,7 +167,23 @@ export class SongwriterView extends ItemView {
     flagBtn.addClass("sw-flag-btn");
     flagBtn.addEventListener("click", () => this.engine.setMarkerHere());
 
+    this.nextBtn = this.transportBtn(bar, "step-forward", t("nextTrackTitle"));
+    this.nextBtn.addClass("sw-queue-btn");
+    this.nextBtn.addEventListener("click", () => {
+      void this.engine.step(1);
+    });
+
     this.refreshSeekTitles();
+  }
+
+  /** ⏮ ⏭ only make sense with a playlist, and only where there is a neighbor. */
+  private updateQueueButtons() {
+    if (!this.prevBtn || !this.nextBtn) return;
+    const many = this.engine.queue.length > 1;
+    this.prevBtn.toggle(many);
+    this.nextBtn.toggle(many);
+    this.prevBtn.disabled = !this.engine.hasStep(-1);
+    this.nextBtn.disabled = !this.engine.hasStep(1);
   }
 
   private transportBtn(parent: HTMLElement, icon: string, title: string): HTMLButtonElement {
@@ -170,6 +209,7 @@ export class SongwriterView extends ItemView {
     this.contentRoot.toggle(hasTrack);
     this.renderTrackRow();
     this.renderPending();
+    this.renderPlaylist();
     this.updatePlayButton();
     this.updateTotalTime();
     this.updateCurrentTime();
@@ -181,40 +221,20 @@ export class SongwriterView extends ItemView {
     this.trackRow.empty();
     this.playsEl = null;
     const file = this.engine.file;
-    const audios = this.engine.noteAudios;
     const icon = this.trackRow.createSpan({ cls: "sw-track-icon" });
     setIcon(icon, "music");
 
-    if (audios.length > 1) {
-      const sel = this.trackRow.createEl("select", { cls: "dropdown sw-track-select" });
-      let hasCurrent = false;
-      for (const f of audios) {
-        const opt = sel.createEl("option", { text: f.basename });
-        opt.value = f.path;
-        if (file && f.path === file.path) hasCurrent = true;
-      }
-      if (file && !hasCurrent) {
-        const opt = sel.createEl("option", { text: file.basename });
-        opt.value = file.path;
-      }
-      if (file) sel.value = file.path;
-      sel.title = t("noteAudiosTitle");
-      sel.addEventListener("change", () => {
-        const f = this.app.vault.getAbstractFileByPath(sel.value);
-        if (f instanceof TFile) void this.engine.load(f, { autoplay: this.engine.playing });
+    const name = this.trackRow.createSpan({
+      cls: "sw-track-name",
+      text: file ? file.basename : "—"
+    });
+    if (file) {
+      name.addClass("sw-track-name-link");
+      name.title = t("openTrackNoteTitle");
+      name.addEventListener("click", () => {
+        void this.plugin.openTrackNote();
       });
-    } else {
-      const name = this.trackRow.createSpan({
-        cls: "sw-track-name",
-        text: file ? file.basename : "—"
-      });
-      if (file) {
-        name.addClass("sw-track-name-link");
-        name.title = t("openTrackNoteTitle");
-        name.addEventListener("click", () => {
-          void this.plugin.openTrackNote();
-        });
-      }
+      this.makeRowDraggable(name, file); // the loaded track drags into a note too
     }
 
     if (file) {
@@ -260,7 +280,7 @@ export class SongwriterView extends ItemView {
     if (!pending) return;
     this.pendingRow.createSpan({
       cls: "sw-pending-text",
-      text: t("pendingInNote")(pending.basename),
+      text: t("pendingSwitchText")(pending.basename),
       title: pending.path
     });
     const switchBtn = this.pendingRow.createEl("button", { text: t("switchBtn") });
@@ -273,9 +293,117 @@ export class SongwriterView extends ItemView {
     closeBtn.addEventListener("click", () => this.engine.setPendingSwitch(null));
   }
 
+  // ---- playlist ----
+
+  private buildPlaylist(parent: HTMLElement) {
+    this.playlistEl = parent.createDiv({ cls: "sw-playlist" });
+
+    const head = this.playlistEl.createDiv({ cls: "sw-playlist-head" });
+    head.title = t("playlistToggleTitle");
+    this.playlistIcon = head.createSpan({ cls: "sw-playlist-icon" });
+    this.playlistTitle = head.createSpan({ cls: "sw-playlist-title" });
+    this.playlistCount = head.createSpan({ cls: "sw-playlist-count" });
+    this.playlistChevron = head.createSpan({ cls: "sw-playlist-chevron" });
+    head.addEventListener("click", () => {
+      this.plugin.settings.playlistCollapsed = !this.plugin.settings.playlistCollapsed;
+      void this.plugin.saveSettings();
+      this.applyPlaylistCollapsed();
+    });
+
+    this.playlistList = this.playlistEl.createDiv({ cls: "sw-playlist-list" });
+  }
+
+  private applyPlaylistCollapsed() {
+    const collapsed = this.plugin.settings.playlistCollapsed;
+    this.playlistList.toggle(!collapsed);
+    setIcon(this.playlistChevron, collapsed ? "chevron-right" : "chevron-down");
+  }
+
+  private renderPlaylist() {
+    if (!this.playlistEl) return;
+    this.updateQueueButtons();
+
+    const queue = this.engine.queue;
+    const source = this.engine.queueSource;
+    // a lone track is not a playlist — the track row already says everything
+    this.playlistEl.toggle(queue.length > 1);
+    if (queue.length <= 1) return;
+
+    setIcon(this.playlistIcon, source?.kind === "folder" ? "folder" : "file-text");
+    this.playlistTitle.setText(source?.name ?? "");
+    this.playlistTitle.title = source
+      ? `${source.kind === "folder" ? t("playlistFromFolder") : t("playlistFromNote")} · ${source.path}`
+      : "";
+    this.playlistCount.setText(String(queue.length));
+    this.playlistCount.title = t("playlistCountTitle")(queue.length);
+    this.applyPlaylistCollapsed();
+
+    this.playlistList.empty();
+    this.playlistRows.clear();
+    const currentPath = this.engine.file?.path;
+    queue.forEach((f, i) => {
+      const row = this.playlistList.createDiv({ cls: "sw-pl-row" });
+      const isCurrent = f.path === currentPath;
+      if (isCurrent) row.addClass("is-current");
+      const num = row.createSpan({ cls: "sw-pl-num" });
+      if (isCurrent) setIcon(num, this.engine.playing ? "volume-2" : "pause");
+      else num.setText(String(i + 1));
+      row.createSpan({ cls: "sw-pl-name", text: f.basename, title: f.path });
+      const flag = row.createSpan({ cls: "sw-pl-flag" });
+      const plays = row.createSpan({ cls: "sw-pl-plays" });
+      this.playlistRows.set(f.path, { flag, plays });
+      this.fillPlaylistRow(f.path);
+      row.addEventListener("click", () => {
+        if (f.path === this.engine.file?.path) void this.engine.playPause();
+        else void this.engine.load(f, { autoplay: this.engine.playing });
+      });
+      this.makeRowDraggable(row, f);
+    });
+  }
+
+  /**
+   * Drag a playlist row into a note and drop an embed of that track there.
+   * The link is built by Obsidian itself, so it follows the vault's link
+   * format (wikilink or markdown, shortest or relative path); the leading "!"
+   * makes it an embed, which this plugin renders as a waveform player.
+   */
+  private makeRowDraggable(row: HTMLElement, file: TFile) {
+    row.draggable = true;
+    row.addEventListener("dragstart", (e) => {
+      const active = this.app.workspace.getActiveFile();
+      const link = this.app.fileManager.generateMarkdownLink(file, active?.path ?? "");
+      const embed = link.startsWith("!") ? link : `!${link}`;
+      e.dataTransfer?.setData("text/plain", embed);
+      if (e.dataTransfer) e.dataTransfer.effectAllowed = "copy";
+      row.addClass("is-dragging");
+    });
+    row.addEventListener("dragend", () => row.removeClass("is-dragging"));
+  }
+
+  /** Marker flag + play count for one row, straight from saved track data. */
+  private fillPlaylistRow(path: string) {
+    const els = this.playlistRows.get(path);
+    if (!els) return;
+    const data = this.plugin.settings.tracks[path];
+    const hasMarker = data?.marker !== null && data?.marker !== undefined;
+    els.flag.empty();
+    if (hasMarker) {
+      setIcon(els.flag, "flag");
+      els.flag.title = t("rowMarkerTitle");
+    }
+    els.plays.setText(data?.plays ? `▶ ${data.plays}` : "");
+  }
+
+  private updatePlaylistRow() {
+    const path = this.engine.file?.path;
+    if (path) this.fillPlaylistRow(path);
+  }
+
   private updatePlayButton() {
     if (!this.playBtn) return;
     setIcon(this.playBtn, this.engine.playing ? "pause" : "play");
+    const num = this.playlistList?.querySelector<HTMLElement>(".sw-pl-row.is-current .sw-pl-num");
+    if (num) setIcon(num, this.engine.playing ? "volume-2" : "pause");
   }
 
   private lastTimeText = "";

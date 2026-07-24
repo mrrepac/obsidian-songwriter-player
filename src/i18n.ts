@@ -46,13 +46,21 @@ const en = {
   setMarkerTitle: "Set marker here",
   seekBackTitle: (s: number) => `Back ${s}s`,
   seekFwdTitle: (s: number) => `Forward ${s}s`,
-  noteAudiosTitle: "Audio files of the current note",
   openTrackNoteTitle: "Open the track's note (Alt+D)",
   playsTitle: "Play count · total listened. Right-click — reset.",
   ejectTitle: "Unload track from the player",
-  pendingInNote: (name: string) => `In the note: ${name}`,
+  pendingSwitchText: (name: string) => `Queued: ${name}`,
   switchBtn: "Switch",
   hideBtn: "Hide",
+
+  // playlist
+  prevTrackTitle: "Previous track (Alt+B)",
+  nextTrackTitle: "Next track (Alt+N)",
+  playlistToggleTitle: "Collapse / expand the playlist",
+  playlistFromNote: "Playlist of the note",
+  playlistFromFolder: "Playlist of the folder",
+  playlistCountTitle: (n: number) => `${n} audio files`,
+  rowMarkerTitle: "The track has a marker",
 
   waveLoading: "Analyzing waveform…",
 
@@ -72,6 +80,13 @@ const en = {
   setSkipDesc: "How many seconds the back/forward buttons and hotkeys jump.",
   setStartMarkerName: "Start from marker",
   setStartMarkerDesc: "When a track loads, the position jumps straight to the marker (if one is set).",
+  headingPlaylist: "Playlist",
+  setFolderQueueName: "Whole folder as a playlist",
+  setFolderQueueDesc:
+    "Opening an audio file queues up every audio file next to it, so ⏮ ⏭ walk the folder. Off: the file is loaded alone.",
+  setAutoAdvanceName: "Play the playlist through",
+  setAutoAdvanceDesc:
+    "When a track ends, the next one in the playlist starts. The last track just stops. A track with an A-B zone keeps looping and never advances.",
   headingFine: "Fine tuning",
   setPlayCountName: "Play-count threshold",
   setPlayCountDesc: "How many seconds must actually sound for a run to land in the play counter.",
@@ -124,13 +139,20 @@ const ru: typeof en = {
   setMarkerTitle: "Поставить маркер здесь",
   seekBackTitle: (s: number) => `Назад на ${s} сек`,
   seekFwdTitle: (s: number) => `Вперёд на ${s} сек`,
-  noteAudiosTitle: "Аудиофайлы текущей заметки",
   openTrackNoteTitle: "Открыть заметку с треком (Alt+D)",
   playsTitle: "Проигрываний · наиграно всего. Правый клик — сброс.",
   ejectTitle: "Выгрузить трек из плеера",
-  pendingInNote: (name: string) => `В заметке: ${name}`,
+  pendingSwitchText: (name: string) => `На очереди: ${name}`,
   switchBtn: "Переключить",
   hideBtn: "Скрыть",
+
+  prevTrackTitle: "Предыдущий трек (Alt+B)",
+  nextTrackTitle: "Следующий трек (Alt+N)",
+  playlistToggleTitle: "Свернуть / развернуть плейлист",
+  playlistFromNote: "Плейлист заметки",
+  playlistFromFolder: "Плейлист папки",
+  playlistCountTitle: (n: number) => `Аудиофайлов: ${n}`,
+  rowMarkerTitle: "У трека есть маркер",
 
   waveLoading: "Анализ волны…",
 
@@ -148,6 +170,13 @@ const ru: typeof en = {
   setSkipDesc: "На сколько секунд перематывают кнопки и хоткеи «назад/вперёд».",
   setStartMarkerName: "Начинать с маркера",
   setStartMarkerDesc: "При загрузке трека позиция сразу ставится на маркер (если он задан).",
+  headingPlaylist: "Плейлист",
+  setFolderQueueName: "Вся папка как плейлист",
+  setFolderQueueDesc:
+    "При открытии аудиофайла в очередь встают все аудиофайлы рядом с ним, и кнопки ⏮ ⏭ ходят по папке. Выключено — файл грузится в одиночку.",
+  setAutoAdvanceName: "Играть плейлист подряд",
+  setAutoAdvanceDesc:
+    "Когда трек доиграл, включается следующий из плейлиста. После последнего плеер просто останавливается. Трек с зоной A-B продолжает крутиться и никуда не переключается.",
   headingFine: "Тонкая настройка",
   setPlayCountName: "Порог зачёта прогона",
   setPlayCountDesc: "Сколько секунд должно реально прозвучать, чтобы прогон попал в счётчик проигрываний.",

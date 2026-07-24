@@ -1,13 +1,23 @@
+/* Column layout so the playlist can claim every pixel the player leaves,
+   instead of scrolling inside a fixed-height box with empty space below. */
 .sw-root {
   padding: 4px 2px;
   user-select: none;
   container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .sw-player {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex-shrink: 0;
+}
+
+.sw-empty {
+  flex-shrink: 0;
 }
 
 /* ---- empty state ---- */
@@ -52,11 +62,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.sw-track-select {
-  flex: 1;
-  min-width: 0;
 }
 
 .sw-track-name {
@@ -422,6 +427,152 @@ body.sw-hide-embed-buttons .sw-embed-ext {
   color: var(--color-orange, #e0a03c);
 }
 
+.sw-queue-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.sw-queue-btn:disabled:hover {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+/* ---- playlist ---- */
+
+.sw-playlist {
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px solid var(--background-modifier-border);
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.sw-playlist-head {
+  flex-shrink: 0;
+}
+
+.sw-playlist-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.sw-playlist-head:hover {
+  background: var(--background-modifier-hover);
+}
+
+.sw-playlist-icon,
+.sw-playlist-chevron {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.sw-playlist-icon svg,
+.sw-playlist-chevron svg {
+  width: 14px;
+  height: 14px;
+}
+
+.sw-playlist-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+}
+
+.sw-playlist-count,
+.sw-pl-plays {
+  flex-shrink: 0;
+  font-size: var(--font-ui-smaller);
+  font-family: var(--font-monospace);
+  color: var(--text-faint);
+}
+
+.sw-playlist-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: 2px;
+  /* scrolls only once the list outgrows the panel */
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.sw-pl-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+}
+
+.sw-pl-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.sw-pl-row.is-dragging,
+.sw-track-name.is-dragging {
+  opacity: 0.5;
+}
+
+.sw-pl-row.is-current {
+  background: var(--background-secondary-alt);
+}
+
+.sw-pl-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  flex-shrink: 0;
+  font-size: var(--font-ui-smaller);
+  font-family: var(--font-monospace);
+  color: var(--text-faint);
+}
+
+.sw-pl-num svg {
+  width: 13px;
+  height: 13px;
+}
+
+.sw-pl-row.is-current .sw-pl-num {
+  color: var(--interactive-accent);
+}
+
+.sw-pl-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-ui-smaller);
+}
+
+.sw-pl-row.is-current .sw-pl-name {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.sw-pl-flag {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--color-orange, #e0a03c);
+}
+
+.sw-pl-flag svg {
+  width: 11px;
+  height: 11px;
+}
+
 .sw-volume {
   display: flex;
   align-items: center;
@@ -444,6 +595,13 @@ body.sw-hide-embed-buttons .sw-embed-ext {
 
 @container (max-width: 260px) {
   .sw-volume-icon {
+    display: none;
+  }
+}
+
+/* very narrow panel: ⏮ ⏭ go first — the playlist rows still switch tracks */
+@container (max-width: 210px) {
+  .sw-queue-btn {
     display: none;
   }
 }

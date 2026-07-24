@@ -1,5 +1,5 @@
 import { App, MarkdownView, Notice, Platform, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf } from "obsidian";
-import { DEFAULT_SETTINGS, SongwriterSettings, TrackData, isAudioPath } from "./types";
+import { DEFAULT_SETTINGS, QueueSource, SongwriterSettings, TrackData, isAudioPath } from "./types";
 import { t } from "./i18n";
 import { openExternally, revealInExplorer } from "./external";
 import { EmbedPlayers } from "./embed";
@@ -117,6 +117,30 @@ export default class SongwriterPlugin extends Plugin {
     });
 
     this.addCommand({
+      id: "next-track",
+      name: "Next track in the playlist",
+      hotkeys: [
+        { modifiers: ["Alt"], key: "n" },
+        { modifiers: ["Alt"], key: "т" }
+      ],
+      callback: () => {
+        void this.engine.step(1);
+      }
+    });
+
+    this.addCommand({
+      id: "prev-track",
+      name: "Previous track in the playlist",
+      hotkeys: [
+        { modifiers: ["Alt"], key: "b" },
+        { modifiers: ["Alt"], key: "и" }
+      ],
+      callback: () => {
+        void this.engine.step(-1);
+      }
+    });
+
+    this.addCommand({
       id: "load-from-note",
       name: "Load audio from current note",
       callback: () => this.loadFromActiveNote(false)
@@ -180,8 +204,8 @@ export default class SongwriterPlugin extends Plugin {
         this.requestSave();
       }
       if (this.engine.file === file) void this.engine.refreshSrc();
-      if (this.engine.noteAudios.includes(file)) {
-        this.engine.setNoteAudios([...this.engine.noteAudios]);
+      if (this.engine.queue.includes(file)) {
+        this.engine.setQueue([...this.engine.queue], this.engine.queueSource);
       }
     }));
 
@@ -192,8 +216,8 @@ export default class SongwriterPlugin extends Plugin {
         this.requestSave();
       }
       if (this.engine.pendingSwitch?.path === file.path) this.engine.setPendingSwitch(null);
-      if (this.engine.noteAudios.some(f => f.path === file.path)) {
-        this.engine.setNoteAudios(this.engine.noteAudios.filter(f => f.path !== file.path));
+      if (this.engine.queue.some(f => f.path === file.path)) {
+        this.engine.setQueue(this.engine.queue.filter(f => f.path !== file.path), this.engine.queueSource);
       }
       if (this.engine.file?.path === file.path) this.engine.unload();
     }));
@@ -229,45 +253,76 @@ export default class SongwriterPlugin extends Plugin {
     this.engine.destroy();
   }
 
-  // ---- pickup from the active note ----
+  // ---- pickup from the active note / folder ----
 
   private handleFileOpen(file: TFile | null) {
     if (!file) return;
 
     let audios: TFile[];
+    let source: QueueSource | null;
+    let target: TFile;
+    /** An audio file was opened by hand: that exact file wins over the queue. */
+    let explicit: boolean;
+
     if (isAudioPath(file.path)) {
-      audios = [file];
+      audios = this.settings.folderQueue ? this.collectFolderAudios(file) : [file];
+      source = audios.length > 1 && file.parent
+        ? { kind: "folder", name: file.parent.name || "/", path: file.parent.path }
+        : null;
+      target = file;
+      explicit = true;
       this.engine.sourceNote = null;
     } else if (file.extension === "md") {
       audios = this.collectNoteAudios(file);
-      if (audios.length > 0) this.engine.sourceNote = file;
+      if (audios.length === 0) {
+        // a note without audio (lyrics, a diary page) leaves the playlist
+        // alone: it belongs to the loaded track, not to the note being read
+        this.engine.setPendingSwitch(null);
+        return;
+      }
+      this.engine.sourceNote = file;
+      source = { kind: "note", name: file.basename, path: file.path };
+      target = audios[0];
+      explicit = false;
     } else {
       return;
     }
 
-    this.engine.setNoteAudios(audios);
-    if (audios.length === 0) {
+    this.engine.setQueue(audios, source);
+
+    const current = this.engine.file;
+    if (current && current.path === target.path) {
       this.engine.setPendingSwitch(null);
       return;
     }
-
-    const currentInNote = !!this.engine.file && audios.some(f => f.path === this.engine.file!.path);
-    if (currentInNote) {
+    // a note whose audio is already loaded keeps playing — only an explicitly
+    // opened audio file overrides the current track
+    if (!explicit && current && audios.some(f => f.path === current.path)) {
       this.engine.setPendingSwitch(null);
       return;
     }
 
     switch (this.settings.pickupMode) {
       case "auto":
-        void this.engine.load(audios[0], { autoplay: this.engine.playing });
+        void this.engine.load(target, { autoplay: this.engine.playing });
         break;
       case "hybrid":
-        if (this.engine.playing) this.engine.setPendingSwitch(audios[0]);
-        else void this.engine.load(audios[0]);
+        if (this.engine.playing) this.engine.setPendingSwitch(target);
+        else void this.engine.load(target);
         break;
       case "manual":
         break;
     }
+  }
+
+  /** Every audio file sitting next to this one, in file-explorer-ish order. */
+  collectFolderAudios(file: TFile): TFile[] {
+    const parent = file.parent;
+    if (!parent) return [file];
+    const out = parent.children
+      .filter((c): c is TFile => c instanceof TFile && isAudioPath(c.path))
+      .sort((a, b) => a.basename.localeCompare(b.basename, undefined, { numeric: true, sensitivity: "base" }));
+    return out.length > 0 ? out : [file];
   }
 
   collectNoteAudios(note: TFile): TFile[] {
@@ -295,14 +350,21 @@ export default class SongwriterPlugin extends Plugin {
       if (!silent) new Notice(t("noActiveNote"));
       return;
     }
-    const audios = isAudioPath(active.path) ? [active] : this.collectNoteAudios(active);
-    this.engine.setNoteAudios(audios);
+    const isAudio = isAudioPath(active.path);
+    const audios = isAudio
+      ? (this.settings.folderQueue ? this.collectFolderAudios(active) : [active])
+      : this.collectNoteAudios(active);
     if (audios.length === 0) {
       if (!silent) new Notice(t("noAudioInNote"));
       return;
     }
+    this.engine.setQueue(audios, isAudio
+      ? (audios.length > 1 && active.parent
+        ? { kind: "folder", name: active.parent.name || "/", path: active.parent.path }
+        : null)
+      : { kind: "note", name: active.basename, path: active.path });
     this.engine.sourceNote = active.extension === "md" ? active : null;
-    await this.engine.load(audios[0]);
+    await this.engine.load(isAudio ? active : audios[0]);
   }
 
   /** Jump back to the note the current track was picked up from. */
@@ -457,6 +519,28 @@ class SongwriterSettingTab extends PluginSettingTab {
         .setValue(this.plugin.settings.startFromMarkerOnLoad)
         .onChange(async (value) => {
           this.plugin.settings.startFromMarkerOnLoad = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl).setName(t("headingPlaylist")).setHeading();
+
+    new Setting(containerEl)
+      .setName(t("setFolderQueueName"))
+      .setDesc(t("setFolderQueueDesc"))
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.folderQueue)
+        .onChange(async (value) => {
+          this.plugin.settings.folderQueue = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName(t("setAutoAdvanceName"))
+      .setDesc(t("setAutoAdvanceDesc"))
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.autoAdvance)
+        .onChange(async (value) => {
+          this.plugin.settings.autoAdvance = value;
           await this.plugin.saveSettings();
         }));
 

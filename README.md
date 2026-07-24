@@ -30,7 +30,14 @@ not in the UI).
   only kicks in when playback itself reaches the B edge. The zone is remembered per
   file; clear it by clicking outside it or with the Clear A-B loop zone command (the
   marker stays).
-- **Several audio files in one note** — a dropdown lists the note's tracks.
+- **Playlist** — open a note holding several audio files and they line up as its
+  playlist; open an audio file and every audio file next to it in the folder does.
+  The list sits under the player (collapsible, remembers its state): the current
+  track is highlighted, each row shows its play count and a ⚑ if the track has a
+  marker, a click switches to it — and keeps playing if something was playing.
+  `⏮ ⏭` walk the list, and the list survives ejecting the track, so you can pick
+  the next one from it. Optionally the playlist plays through on its own; a track
+  with an A-B zone keeps looping instead.
 - **Play count and total listened time** — next to the track name (`▶ 27 · 2h40m`).
   A run only counts once 5 seconds have actually sounded (start-and-stop does not
   count; pause-and-resume keeps accumulating). Every loop-zone pass is a new run.
@@ -68,6 +75,7 @@ duplicated out of the box.
 | Play/Pause | `Alt+P` |
 | Open track's note | `Alt+D` |
 | Seek back / forward | `Alt+,` / `Alt+.` |
+| Previous / next track in the playlist | `Alt+B` / `Alt+N` |
 
 Without default keys: Clear marker, Clear A-B loop zone, Load audio from current
 note, Open player panel, Unload track, Open track in default app, Reveal track in
@@ -75,9 +83,10 @@ system explorer.
 
 ## Settings
 
-Besides the basics (pickup mode, seek step, start from marker) there is a
-fine-tuning section: the play-count threshold, the double-stop window, the waveform
-height, and the embedded-player button.
+Besides the basics (pickup mode, seek step, start from marker) there is a playlist
+section (whole folder as a playlist, play the playlist through) and a fine-tuning
+one: the play-count threshold, the double-stop window, the waveform height, and the
+embedded-player button.
 
 ## Data
 

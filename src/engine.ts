@@ -1,6 +1,6 @@
 import { Events, Notice, TFile } from "obsidian";
 import type SongwriterPlugin from "./main";
-import { TrackData, emptyTrackData, formatTime } from "./types";
+import { QueueSource, TrackData, emptyTrackData, formatTime } from "./types";
 import { t } from "./i18n";
 
 /**
@@ -11,13 +11,15 @@ import { t } from "./i18n";
  *  - "track-changed" (file: TFile | null)
  *  - "play-state"    (playing: boolean)
  *  - "data-changed"  ()                    // start point / markers
- *  - "note-audios"   (files: TFile[])
+ *  - "queue-changed" (files: TFile[])
  *  - "pending-switch"(file: TFile | null)
  */
 export class PlayerEngine extends Events {
   audio: HTMLAudioElement;
   file: TFile | null = null;
-  noteAudios: TFile[] = [];
+  /** The playlist the current track belongs to (a note's audios or a folder). */
+  queue: TFile[] = [];
+  queueSource: QueueSource | null = null;
   pendingSwitch: TFile | null = null;
   /** The note the current track was picked up from (null if opened directly). */
   sourceNote: TFile | null = null;
@@ -53,6 +55,11 @@ export class PlayerEngine extends Events {
       this.pendingPlaySec = null; // an under-5s tail never scores
       this.updateLoopTimer();
       this.trigger("play-state", false);
+      // the playlist rolls on only if asked to, and only for a track that is
+      // actually in it; the last track just stops
+      if (this.plugin.settings.autoAdvance && this.queueIndex >= 0) {
+        void this.step(1, { autoplay: true });
+      }
     });
     this.audio.addEventListener("timeupdate", this.checkLoop);
     this.audio.addEventListener("seeked", () => {
@@ -417,11 +424,46 @@ export class PlayerEngine extends Events {
     }
   }
 
-  // ---- note pickup ----
+  // ---- playlist ----
 
-  setNoteAudios(files: TFile[]) {
-    this.noteAudios = files;
-    this.trigger("note-audios", files);
+  setQueue(files: TFile[], source: QueueSource | null = null) {
+    this.queue = files;
+    this.queueSource = files.length > 0 ? source : null;
+    this.trigger("queue-changed", files);
+  }
+
+  /** Position of the current track in the queue, or -1 if it is not in there. */
+  get queueIndex(): number {
+    if (!this.file) return -1;
+    const path = this.file.path;
+    return this.queue.findIndex(f => f.path === path);
+  }
+
+  /**
+   * Move by `delta` inside the queue. Keeps playing if something was playing
+   * (that is what makes ⏭ feel like a player rather than a file picker), and
+   * does nothing at the edges — the playlist does not wrap.
+   */
+  async step(delta: number, opts: { autoplay?: boolean } = {}): Promise<boolean> {
+    const i = this.queueIndex;
+    if (i < 0) {
+      // nothing loaded (or the track was ejected): enter the playlist at its edge
+      if (this.queue.length === 0) return false;
+      const entry = delta > 0 ? this.queue[0] : this.queue[this.queue.length - 1];
+      await this.load(entry, { autoplay: opts.autoplay ?? false });
+      return true;
+    }
+    const target = this.queue[i + delta];
+    if (!target) return false;
+    const autoplay = opts.autoplay ?? this.playing;
+    await this.load(target, { autoplay });
+    return true;
+  }
+
+  hasStep(delta: number): boolean {
+    const i = this.queueIndex;
+    if (i < 0) return this.queue.length > 0;
+    return !!this.queue[i + delta];
   }
 
   setPendingSwitch(file: TFile | null) {
