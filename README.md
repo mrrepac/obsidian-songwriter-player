@@ -36,7 +36,7 @@ not in the UI).
   count; pause-and-resume keeps accumulating). Every loop-zone pass is a new run.
   Listened time accumulates only while sound is actually playing. Right-click the
   counter to reset both.
-- **Back to the track's note** — click the track name (or `Ctrl+Alt+S`) to jump to the
+- **Back to the track's note** — click the track name (or `Alt+D`) to jump to the
   note the track was picked up from: if it is open in a tab, that tab is focused,
   otherwise the note opens; if the source is unknown, any note linking to the file is
   used.
@@ -62,12 +62,12 @@ duplicated out of the box.
 
 | Command | Keys |
 | --- | --- |
-| Play from marker (or from start) | `Ctrl+Alt+X` |
-| Stop (double press: the next `Ctrl+Alt+X` plays from the start, marker intact; triple: the marker and the zone are deleted) | `Ctrl+Alt+C` |
-| Set marker at current position | `Ctrl+Alt+A` |
-| Play/Pause | `Ctrl+Alt+P` |
-| Open track's note | `Ctrl+Alt+S` |
-| Seek back / forward | `Ctrl+Alt+,` / `Ctrl+Alt+.` |
+| Play from marker (or from start) | `Alt+X` |
+| Stop (double press: the next `Alt+X` plays from the start, marker intact; triple: the marker and the zone are deleted) | `Alt+C` |
+| Set marker at current position | `Alt+Z` |
+| Play/Pause | `Alt+P` |
+| Open track's note | `Alt+D` |
+| Seek back / forward | `Alt+,` / `Alt+.` |
 
 Without default keys: Clear marker, Clear A-B loop zone, Load audio from current
 note, Open player panel, Unload track, Open track in default app, Reveal track in

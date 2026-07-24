@@ -48,8 +48,8 @@ export default class SongwriterPlugin extends Plugin {
       id: "play-pause",
       name: "Play/Pause",
       hotkeys: [
-        { modifiers: ["Mod", "Alt"], key: "p" },
-        { modifiers: ["Mod", "Alt"], key: "з" }
+        { modifiers: ["Alt"], key: "p" },
+        { modifiers: ["Alt"], key: "з" }
       ],
       callback: () => this.engine.playPause()
     });
@@ -58,8 +58,8 @@ export default class SongwriterPlugin extends Plugin {
       id: "play-from-marker",
       name: "Play from marker (or from start)",
       hotkeys: [
-        { modifiers: ["Mod", "Alt"], key: "x" },
-        { modifiers: ["Mod", "Alt"], key: "ч" }
+        { modifiers: ["Alt"], key: "x" },
+        { modifiers: ["Alt"], key: "ч" }
       ],
       callback: () => this.engine.playFromMarker()
     });
@@ -68,8 +68,8 @@ export default class SongwriterPlugin extends Plugin {
       id: "stop",
       name: "Stop",
       hotkeys: [
-        { modifiers: ["Mod", "Alt"], key: "c" },
-        { modifiers: ["Mod", "Alt"], key: "с" }
+        { modifiers: ["Alt"], key: "c" },
+        { modifiers: ["Alt"], key: "с" }
       ],
       callback: () => this.engine.stop()
     });
@@ -78,8 +78,8 @@ export default class SongwriterPlugin extends Plugin {
       id: "set-marker",
       name: "Set marker at current position",
       hotkeys: [
-        { modifiers: ["Mod", "Alt"], key: "a" },
-        { modifiers: ["Mod", "Alt"], key: "ф" }
+        { modifiers: ["Alt"], key: "z" },
+        { modifiers: ["Alt"], key: "я" }
       ],
       callback: () => this.engine.setMarkerHere()
     });
@@ -100,8 +100,8 @@ export default class SongwriterPlugin extends Plugin {
       id: "seek-back",
       name: "Seek back",
       hotkeys: [
-        { modifiers: ["Mod", "Alt"], key: "," },
-        { modifiers: ["Mod", "Alt"], key: "б" }
+        { modifiers: ["Alt"], key: "," },
+        { modifiers: ["Alt"], key: "б" }
       ],
       callback: () => this.engine.seekBy(-this.settings.skipSeconds)
     });
@@ -110,8 +110,8 @@ export default class SongwriterPlugin extends Plugin {
       id: "seek-forward",
       name: "Seek forward",
       hotkeys: [
-        { modifiers: ["Mod", "Alt"], key: "." },
-        { modifiers: ["Mod", "Alt"], key: "ю" }
+        { modifiers: ["Alt"], key: "." },
+        { modifiers: ["Alt"], key: "ю" }
       ],
       callback: () => this.engine.seekBy(this.settings.skipSeconds)
     });
@@ -126,8 +126,8 @@ export default class SongwriterPlugin extends Plugin {
       id: "open-track-note",
       name: "Open track's note",
       hotkeys: [
-        { modifiers: ["Mod", "Alt"], key: "s" },
-        { modifiers: ["Mod", "Alt"], key: "ы" }
+        { modifiers: ["Alt"], key: "d" },
+        { modifiers: ["Alt"], key: "в" }
       ],
       callback: () => this.openTrackNote()
     });
