@@ -9,9 +9,29 @@ if you want to view the source, please visit the github repository of this plugi
 
 const prod = process.argv[2] === "production";
 
+/**
+ * The analysis worker is bundled first and injected into the plugin as a
+ * string. Obsidian installs a single main.js, so the worker cannot ship as its
+ * own file — and it must not run on the UI thread, because essentia's tempo
+ * extractor blocks for seconds on a full track.
+ */
+const workerBuild = await esbuild.build({
+  entryPoints: ["src/analysis-worker.ts"],
+  bundle: true,
+  external: [...builtinModules],
+  format: "iife",
+  target: "es2016",
+  logLevel: "warning",
+  write: false
+});
+const workerSource = workerBuild.outputFiles[0].text;
+
 const buildOptions = {
   banner: {
     js: banner,
+  },
+  define: {
+    ANALYSIS_WORKER_SOURCE: JSON.stringify(workerSource)
   },
   entryPoints: ["src/main.ts"],
   bundle: true,

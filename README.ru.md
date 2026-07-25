@@ -36,6 +36,9 @@
 | Open track's note | `Alt+D` |
 | Seek back / forward | `Alt+,` / `Alt+.` |
 | Previous / next track in the playlist | `Alt+B` / `Alt+N` |
+| Медленнее / быстрее (шаг — один bpm, тональность на месте) | `Alt+-` / `Alt+=` |
+| Транспонировать вниз / вверх на полутон (только ПК) | `Alt+PageDown` / `Alt+PageUp` |
+| Играть как записано — и скорость, и тональность | `Alt+0` |
 
 Без дефолтных клавиш: Clear marker, Clear A-B loop zone, Load audio from current note, Open player panel, Unload track, Open track in default app, Reveal track in system explorer.
 
@@ -54,3 +57,13 @@ npm install
 npm run build   # tsc typecheck + esbuild → main.js
 npm run dev     # watch-режим
 ```
+
+## Лицензия
+
+**GNU AGPL-3.0.** В плагин вшита [essentia.js](https://github.com/MTG/essentia.js) 0.1.3
+(Music Technology Group, Universitat Pompeu Fabra) — ей считаются темп и тональность.
+Она под AGPL-3.0, поэтому и собранный плагин целиком под AGPL-3.0. Исходники essentia
+лежат на <https://github.com/MTG/essentia>; внутри `main.js` — неизменённая сборка из npm.
+
+Пользование плагином никаких обязательств не накладывает. Обязательства возникают у того,
+кто распространяет изменённую версию: исходники должны остаться открытыми под той же лицензией.

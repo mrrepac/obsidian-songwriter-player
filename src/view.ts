@@ -1,9 +1,13 @@
-import { ItemView, WorkspaceLeaf, TFile, setIcon } from "obsidian";
+import { ItemView, Menu, Platform, WorkspaceLeaf, TFile, setIcon } from "obsidian";
 import type SongwriterPlugin from "./main";
 import { PlayerEngine } from "./engine";
 import { EXT_BTN_TITLE, openExternally, revealInExplorer } from "./external";
 import { WaveformRenderer } from "./waveform";
-import { formatPlayed, formatTime } from "./types";
+import { KEY_PROFILES } from "./musical";
+import { playTriad } from "./tone";
+import { transposeKey } from "./pitch";
+import { renderedName } from "./render";
+import { formatKey, formatPlayed, formatTime } from "./types";
 import { t } from "./i18n";
 
 export const VIEW_TYPE_SONGWRITER = "songwriter-player";
@@ -21,7 +25,10 @@ export class SongwriterView extends ItemView {
   private playlistTitle: HTMLElement;
   private playlistCount: HTMLElement;
   private playlistChevron: HTMLElement;
-  private playlistRows = new Map<string, { flag: HTMLElement; plays: HTMLElement }>();
+  private playlistRows = new Map<string, { flag: HTMLElement; plays: HTMLElement; musical: HTMLElement }>();
+  private musicalEl: HTMLElement | null = null;
+  private rateEl: HTMLElement;
+  private pitchEl: HTMLElement | null = null;
   private waveWrap: HTMLElement;
   private timeCurrent: HTMLElement;
   private timeTotal: HTMLElement;
@@ -89,6 +96,16 @@ export class SongwriterView extends ItemView {
 
     this.buildTransport(controls);
 
+    this.rateEl = controls.createSpan({ cls: "sw-rate" });
+    this.rateEl.addEventListener("click", () => this.onRateClick());
+    this.updateRate();
+
+    if (Platform.isDesktop) {
+      this.pitchEl = controls.createSpan({ cls: "sw-pitch" });
+      this.pitchEl.addEventListener("click", () => this.onPitchClick());
+      this.updatePitch();
+    }
+
     const volWrap = controls.createDiv({ cls: "sw-volume" });
     const volIcon = volWrap.createSpan({ cls: "sw-volume-icon" });
     setIcon(volIcon, "volume-2");
@@ -109,6 +126,7 @@ export class SongwriterView extends ItemView {
     this.registerEvent(this.engine.on("play-state", () => this.updatePlayButton()));
     this.registerEvent(this.engine.on("data-changed", () => {
       this.updatePlays();
+      this.updateMusical();
       this.updatePlaylistRow();
       this.wave?.markDirty();
     }));
@@ -117,6 +135,8 @@ export class SongwriterView extends ItemView {
       this.renderPlaylist();
     }));
     this.registerEvent(this.engine.on("pending-switch", () => this.renderPending()));
+    this.registerEvent(this.engine.on("rate-changed", () => this.updateRate()));
+    this.registerEvent(this.engine.on("pitch-changed", () => this.updatePitch()));
     this.registerEvent(this.app.workspace.on("css-change", () => this.wave?.refreshColors()));
 
     this.registerDomEvent(this.engine.audio, "durationchange", () => this.updateTotalTime());
@@ -210,6 +230,8 @@ export class SongwriterView extends ItemView {
     this.renderTrackRow();
     this.renderPending();
     this.renderPlaylist();
+    this.updateRate();
+    this.updatePitch();
     this.updatePlayButton();
     this.updateTotalTime();
     this.updateCurrentTime();
@@ -220,6 +242,7 @@ export class SongwriterView extends ItemView {
   private renderTrackRow() {
     this.trackRow.empty();
     this.playsEl = null;
+    this.musicalEl = null;
     const file = this.engine.file;
     const icon = this.trackRow.createSpan({ cls: "sw-track-icon" });
     setIcon(icon, "music");
@@ -238,6 +261,10 @@ export class SongwriterView extends ItemView {
     }
 
     if (file) {
+      this.musicalEl = this.trackRow.createSpan({ cls: "sw-musical" });
+      this.musicalEl.addEventListener("click", () => this.onMusicalClick(file));
+      this.updateMusical();
+
       this.playsEl = this.trackRow.createSpan({ cls: "sw-plays" });
       this.playsEl.title = t("playsTitle");
       this.playsEl.addEventListener("contextmenu", (e) => {
@@ -260,6 +287,176 @@ export class SongwriterView extends ItemView {
       ejectBtn.title = t("ejectTitle");
       ejectBtn.addEventListener("click", () => this.engine.unload());
     }
+  }
+
+  // ---- playback speed ----
+
+  /** Shows the tempo it is actually playing at, or the bare factor if unmeasured. */
+  private updateRate() {
+    if (!this.rateEl) return;
+    const rate = this.engine.rate;
+    const bpm = this.engine.peekData()?.bpm;
+    const off = Math.abs(rate - 1) > 0.001;
+    this.rateEl.toggleClass("is-active", off);
+    // at the recorded speed it shows the factor, not the tempo: a bare "140"
+    // next to the badge in the track row reads as a label, not as a control
+    if (bpm && off) {
+      this.rateEl.setText(`${Math.round(bpm * rate)} BPM`);
+      this.rateEl.title = t("rateTitleBpm")(Math.round(bpm * rate), bpm, rate.toFixed(2));
+    } else {
+      this.rateEl.setText(`${rate.toFixed(2)}×`);
+      this.rateEl.title = bpm ? t("rateTitleBpm")(bpm, bpm, "1.00") : t("rateTitle");
+    }
+  }
+
+  private onRateClick() {
+    if (!this.engine.file) return;
+    const bpm = this.engine.peekData()?.bpm;
+    const menu = new Menu();
+    for (const preset of [0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.25, 1.5]) {
+      const label = bpm
+        ? `${preset.toFixed(2)}× — ${Math.round(bpm * preset)} BPM`
+        : `${preset.toFixed(2)}×`;
+      menu.addItem((item) => item
+        .setTitle(preset === 1 ? t("rateOriginal")(label) : label)
+        .setChecked(Math.abs(this.engine.rate - preset) < 0.001)
+        .onClick(() => this.engine.setRate(preset)));
+    }
+    const rect = this.rateEl.getBoundingClientRect();
+    menu.showAtPosition({ x: rect.left, y: rect.top - 4 });
+  }
+
+  // ---- transposition ----
+
+  /** Shows the shift and, when the key is known, where it lands. */
+  private updatePitch() {
+    const el = this.pitchEl;
+    if (!el) return;
+    const semitones = this.engine.semitones;
+    const d = this.engine.peekData();
+    el.toggleClass("is-active", semitones !== 0);
+    el.setText(semitones === 0 ? "♯ 0" : (semitones > 0 ? `♯ +${semitones}` : `♯ ${semitones}`));
+    el.title = d?.key
+      ? t("pitchTitleKey")(formatKey(transposeKey(d.key, semitones), d.scale), formatKey(d.key, d.scale))
+      : t("pitchTitle");
+  }
+
+  private onPitchClick() {
+    if (!this.engine.file) return;
+    const d = this.engine.peekData();
+    const current = this.engine.semitones;
+    const menu = new Menu();
+    for (let n = 5; n >= -5; n--) {
+      const shift = n === 0 ? "0" : (n > 0 ? `+${n}` : String(n));
+      const label = d?.key
+        ? `${shift} — ${formatKey(transposeKey(d.key, n), d.scale)}`
+        : shift;
+      menu.addItem((item) => item
+        .setTitle(n === 0 ? t("pitchOriginal")(label) : label)
+        .setChecked(current === n)
+        .onClick(() => void this.engine.setSemitones(n)));
+    }
+    if (current !== 0 || Math.abs(this.engine.rate - 1) > 0.001) {
+      menu.addSeparator();
+      const name = renderedName(this.engine.file.basename, {
+        semitones: current,
+        rate: this.engine.rate,
+        bpm: d?.bpm ?? null
+      });
+      menu.addItem((item) => item
+        .setTitle(t("menuSaveCopy")(name))
+        .setIcon("save")
+        .onClick(() => void this.plugin.saveTransposedCopy()));
+    }
+
+    const rect = this.pitchEl?.getBoundingClientRect();
+    menu.showAtPosition({ x: rect?.left ?? 0, y: (rect?.top ?? 0) - 4 });
+  }
+
+  // ---- tempo & key ----
+
+  /** The badge next to the track name: "140 · F#m", "…" while measuring, "♩ ?" before. */
+  private updateMusical() {
+    const el = this.musicalEl;
+    const file = this.engine.file;
+    if (!el || !file) return;
+    const d = this.plugin.settings.tracks[file.path];
+    const busy = this.plugin.isAnalysing(file.path);
+    el.toggleClass("is-busy", busy);
+    el.toggleClass("is-empty", !busy && d?.bpm == null);
+
+    if (busy) {
+      el.setText("…");
+      el.title = t("analysing");
+      return;
+    }
+    if (d?.bpm == null) {
+      el.setText("♩ ?");
+      el.title = t("analyseHint");
+      return;
+    }
+    const key = formatKey(d.key, d.scale);
+    el.setText(key ? `${d.bpm} · ${key}` : String(d.bpm));
+    const votes = d.scaleAlt
+      ? t("votesSplit")(d.keyVotes ?? 0, KEY_PROFILES.length, formatKey(d.key, d.scaleAlt))
+      : t("votesUnanimous");
+    el.title = t("musicalTitle")(votes, !!d.musicalEdited);
+  }
+
+  private onMusicalClick(file: TFile) {
+    const d = this.plugin.settings.tracks[file.path];
+    if (this.plugin.isAnalysing(file.path)) return;
+    if (d?.bpm == null) {
+      void this.plugin.analyseTrack(file, true);
+      return;
+    }
+
+    const menu = new Menu();
+    menu.addItem((item) => item
+      .setTitle(t("menuDouble"))
+      .setIcon("chevrons-up")
+      .onClick(() => this.plugin.editMusical(file.path, { bpm: Math.round(d.bpm! * 2) })));
+    menu.addItem((item) => item
+      .setTitle(t("menuHalf"))
+      .setIcon("chevrons-down")
+      .onClick(() => this.plugin.editMusical(file.path, { bpm: Math.round(d.bpm! / 2) })));
+
+    if (d.key) {
+      // the runner-up mode when the profiles split, the opposite one otherwise
+      const alt = d.scaleAlt ?? (d.scale === "minor" ? "major" : "minor");
+      const key = d.key;
+      const label = (scale: string | null | undefined) =>
+        `${formatKey(key, scale)} (${scale === "minor" ? t("modeMinor") : t("modeMajor")})`;
+
+      menu.addSeparator();
+      // hearing both triads over the playing beat is the only real way to
+      // settle the mode — no detector is certain about it
+      menu.addItem((item) => item
+        .setTitle(t("menuListen")(label(d.scale)))
+        .setIcon("music")
+        .onClick(() => playTriad(key, d.scale ?? "major")));
+      menu.addItem((item) => item
+        .setTitle(t("menuListen")(label(alt)))
+        .setIcon("music")
+        .onClick(() => playTriad(key, alt)));
+      menu.addItem((item) => item
+        .setTitle(t("menuSwitchMode")(label(alt)))
+        .setIcon("repeat")
+        .onClick(() => this.plugin.editMusical(file.path, { scale: alt, scaleAlt: d.scale })));
+    }
+
+    menu.addSeparator();
+    menu.addItem((item) => item
+      .setTitle(t("menuReanalyse"))
+      .setIcon("refresh-cw")
+      .onClick(() => void this.plugin.analyseTrack(file, true)));
+    menu.addItem((item) => item
+      .setTitle(t("menuForget"))
+      .setIcon("eraser")
+      .onClick(() => this.plugin.forgetMusical(file.path)));
+
+    const rect = this.musicalEl?.getBoundingClientRect();
+    menu.showAtPosition({ x: rect?.left ?? 0, y: (rect?.bottom ?? 0) + 4 });
   }
 
   private lastPlaysText = "";
@@ -350,8 +547,9 @@ export class SongwriterView extends ItemView {
       else num.setText(String(i + 1));
       row.createSpan({ cls: "sw-pl-name", text: f.basename, title: f.path });
       const flag = row.createSpan({ cls: "sw-pl-flag" });
+      const musical = row.createSpan({ cls: "sw-pl-musical" });
       const plays = row.createSpan({ cls: "sw-pl-plays" });
-      this.playlistRows.set(f.path, { flag, plays });
+      this.playlistRows.set(f.path, { flag, plays, musical });
       this.fillPlaylistRow(f.path);
       row.addEventListener("click", () => {
         if (f.path === this.engine.file?.path) void this.engine.playPause();
@@ -392,6 +590,8 @@ export class SongwriterView extends ItemView {
       els.flag.title = t("rowMarkerTitle");
     }
     els.plays.setText(data?.plays ? `▶ ${data.plays}` : "");
+    const key = formatKey(data?.key, data?.scale);
+    els.musical.setText(data?.bpm != null ? (key ? `${data.bpm} ${key}` : String(data.bpm)) : "");
   }
 
   private updatePlaylistRow() {

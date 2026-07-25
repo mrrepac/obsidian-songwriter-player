@@ -1,6 +1,7 @@
-import { Events, Notice, TFile } from "obsidian";
+import { Events, Notice, Platform, TFile } from "obsidian";
 import type SongwriterPlugin from "./main";
 import { QueueSource, TrackData, emptyTrackData, formatTime } from "./types";
+import { createPitchShifter, ensurePitchWorklet, semitonesToRatio } from "./pitch";
 import { t } from "./i18n";
 
 /**
@@ -13,6 +14,8 @@ import { t } from "./i18n";
  *  - "data-changed"  ()                    // start point / markers
  *  - "queue-changed" (files: TFile[])
  *  - "pending-switch"(file: TFile | null)
+ *  - "rate-changed"  (rate: number)
+ *  - "pitch-changed" (semitones: number)
  */
 export class PlayerEngine extends Events {
   audio: HTMLAudioElement;
@@ -155,6 +158,8 @@ export class PlayerEngine extends Events {
     this.plugin.requestSave(); // flush the previous track's listened time
     await this.setSrcAwaitMeta(this.plugin.app.vault.getResourcePath(file));
     if (token !== this.loadToken) return; // superseded by a newer load/unload
+    this.applyRate();
+    void this.applySemitones(); // per-track transposition follows the file
     const start = this.plugin.settings.startFromMarkerOnLoad
       ? (this.peekData()?.marker ?? 0)
       : 0;
@@ -173,6 +178,7 @@ export class PlayerEngine extends Events {
     const wasPlaying = this.playing;
     await this.setSrcAwaitMeta(this.plugin.app.vault.getResourcePath(this.file));
     if (token !== this.loadToken) return; // superseded by a newer load/unload
+    this.applyRate();
     if (t > 0 && t < this.duration) this.audio.currentTime = t;
     if (wasPlaying) await this.safePlay();
     this.trigger("track-changed", this.file);
@@ -308,6 +314,121 @@ export class PlayerEngine extends Events {
     this.plugin.settings.volume = volume;
     this.audio.volume = volume;
     this.plugin.requestSave();
+  }
+
+  // ---- playback speed ----
+  //
+  // preservesPitch keeps the key where it was, so this stretches time only:
+  // "play at 105 instead of 140" rather than a tape slowdown. Kept per track,
+  // because a beat you are learning stays slow until you speed it back up.
+
+  static readonly RATE_MIN = 0.5;
+  static readonly RATE_MAX = 2;
+
+  get rate(): number {
+    return this.audio.playbackRate;
+  }
+
+  setRate(rate: number) {
+    const r = Math.min(PlayerEngine.RATE_MAX, Math.max(PlayerEngine.RATE_MIN, rate));
+    this.audio.playbackRate = r;
+    const d = this.ensureData();
+    if (d) {
+      d.rate = r === 1 ? undefined : r;
+      this.plugin.requestSave();
+    }
+    this.trigger("rate-changed", r);
+  }
+
+  /** Nudge the speed so the track lands on a whole number of bpm, when known. */
+  stepRate(direction: number) {
+    if (!this.file) {
+      new Notice(t("noTrack"));
+      return;
+    }
+    const bpm = this.peekData()?.bpm;
+    if (bpm) {
+      const current = Math.round(bpm * this.rate);
+      this.setRate((current + direction) / bpm);
+    } else {
+      this.setRate(this.rate + direction * 0.05);
+    }
+  }
+
+  // ---- transposition (desktop only) ----
+  //
+  // The shifter is inserted between the element and the speakers, so the
+  // element stays the source of truth for time: seeking, the A-B zone, the
+  // counters and the playhead keep working untouched. The graph is built only
+  // when a shift is actually asked for — until then the audio path is exactly
+  // what it was, and routing an element through Web Audio (flaky on mobile
+  // WebViews) never happens there at all.
+
+  private audioCtx: AudioContext | null = null;
+  private pitchNode: AudioWorkletNode | null = null;
+
+  get semitones(): number {
+    return this.peekData()?.semitones ?? 0;
+  }
+
+  async setSemitones(semitones: number) {
+    if (!this.file) {
+      new Notice(t("noTrack"));
+      return;
+    }
+    if (!Platform.isDesktop) {
+      new Notice(t("desktopOnly"));
+      return;
+    }
+    const value = Math.max(-12, Math.min(12, Math.round(semitones)));
+    const d = this.ensureData();
+    if (d) {
+      d.semitones = value === 0 ? undefined : value;
+      this.plugin.requestSave();
+    }
+    await this.applySemitones();
+    this.trigger("pitch-changed", value);
+  }
+
+  private async applySemitones() {
+    const value = this.semitones;
+    // no shift and no graph yet: leave the plain audio path alone
+    if (value === 0 && !this.pitchNode) return;
+    try {
+      await this.ensureGraph();
+      // AudioParamMap is typed without get() in the DOM lib this project targets
+      const params = this.pitchNode?.parameters as unknown as Map<string, AudioParam> | undefined;
+      params?.get("ratio")?.setValueAtTime(semitonesToRatio(value), this.audioCtx?.currentTime ?? 0);
+    } catch (e) {
+      console.warn("Songwriter: pitch shifting unavailable", e);
+      new Notice(t("pitchUnavailable"));
+    }
+  }
+
+  private async ensureGraph() {
+    if (this.pitchNode) {
+      if (this.audioCtx?.state === "suspended") await this.audioCtx.resume();
+      return;
+    }
+    const AC: typeof AudioContext =
+      window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const ctx = new AC();
+    await ensurePitchWorklet(ctx);
+    // createMediaElementSource can only ever be called once for an element
+    const source = ctx.createMediaElementSource(this.audio);
+    const node = createPitchShifter(ctx);
+    source.connect(node);
+    node.connect(ctx.destination);
+    this.audioCtx = ctx;
+    this.pitchNode = node;
+    if (ctx.state === "suspended") await ctx.resume();
+  }
+
+  private applyRate() {
+    // load() resets playbackRate to 1, so both flags are re-asserted per track
+    (this.audio as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
+    this.audio.playbackRate = this.peekData()?.rate ?? 1;
+    this.trigger("rate-changed", this.audio.playbackRate);
   }
 
   // ---- marker (single per track) ----
@@ -476,6 +597,11 @@ export class PlayerEngine extends Events {
     if (this.loopInterval !== null) {
       window.clearInterval(this.loopInterval);
       this.loopInterval = null;
+    }
+    if (this.audioCtx) {
+      void this.audioCtx.close();
+      this.audioCtx = null;
+      this.pitchNode = null;
     }
     this.audio.pause();
     this.audio.removeAttribute("src");

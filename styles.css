@@ -77,6 +77,45 @@
   color: var(--interactive-accent);
 }
 
+.sw-musical {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: var(--radius-s);
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-family: var(--font-monospace);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sw-musical:hover {
+  color: var(--text-normal);
+}
+
+.sw-musical.is-empty,
+.sw-musical.is-busy {
+  background: transparent;
+  color: var(--text-faint);
+}
+
+.sw-musical.is-busy {
+  cursor: default;
+}
+
+/* with the badge present the counter no longer needs to claim the free space */
+.sw-musical ~ .sw-plays {
+  margin-left: 0;
+}
+
+.sw-pl-musical {
+  flex-shrink: 0;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  font-family: var(--font-monospace);
+}
+
 .sw-plays {
   display: flex;
   align-items: center;
@@ -339,6 +378,10 @@ body.sw-hide-embed-buttons .sw-embed-ext {
 .sw-controls {
   display: flex;
   align-items: center;
+  justify-content: center;
+  /* a narrow sidebar cannot fit time + transport + badges + volume on one
+     line: let it wrap instead of pushing the badges past the edge */
+  flex-wrap: wrap;
   gap: 8px;
   padding: 2px 0 4px;
 }
@@ -571,6 +614,46 @@ body.sw-hide-embed-buttons .sw-embed-ext {
 .sw-pl-flag svg {
   width: 11px;
   height: 11px;
+}
+
+.sw-rate {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-family: var(--font-monospace);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sw-rate:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.sw-rate.is-active,
+.sw-pitch.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.sw-pitch {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-family: var(--font-monospace);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sw-pitch:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
 }
 
 .sw-volume {

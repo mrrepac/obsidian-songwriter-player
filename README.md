@@ -76,6 +76,9 @@ duplicated out of the box.
 | Open track's note | `Alt+D` |
 | Seek back / forward | `Alt+,` / `Alt+.` |
 | Previous / next track in the playlist | `Alt+B` / `Alt+N` |
+| Play slower / faster (one bpm a step, the key stays put) | `Alt+-` / `Alt+=` |
+| Transpose down / up a semitone (desktop only) | `Alt+PageDown` / `Alt+PageUp` |
+| Play as recorded again — speed and key | `Alt+0` |
 
 Without default keys: Clear marker, Clear A-B loop zone, Load audio from current
 note, Open player panel, Unload track, Open track in default app, Reveal track in
@@ -105,6 +108,17 @@ npm run build   # tsc typecheck + esbuild → main.js
 npm run dev     # watch mode
 ```
 
+## License
+
+**GNU AGPL-3.0.** The plugin bundles [essentia.js](https://github.com/MTG/essentia.js)
+0.1.3 (Music Technology Group, Universitat Pompeu Fabra) for tempo and key
+detection — it is licensed under the AGPL-3.0, so the combined work is too. The
+essentia sources are at <https://github.com/MTG/essentia>; the copy shipped inside
+`main.js` is the unmodified npm build.
+
+Using the plugin carries no obligations. Distributing a modified version does: the
+source has to stay available under the same license.
+
 ---
 
-Author: [mrrepac](https://github.com/mrrepac) · MIT
+Author: [mrrepac](https://github.com/mrrepac) · AGPL-3.0

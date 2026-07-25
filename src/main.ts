@@ -1,5 +1,7 @@
 import { App, MarkdownView, Notice, Platform, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf } from "obsidian";
-import { DEFAULT_SETTINGS, QueueSource, SongwriterSettings, TrackData, isAudioPath } from "./types";
+import { DEFAULT_SETTINGS, QueueSource, SongwriterSettings, TrackData, emptyTrackData, isAudioPath } from "./types";
+import { analyseMusical, foldIntoWindow } from "./musical";
+import { renderTransposed, renderedName } from "./render";
 import { t } from "./i18n";
 import { openExternally, revealInExplorer } from "./external";
 import { EmbedPlayers } from "./embed";
@@ -116,6 +118,69 @@ export default class SongwriterPlugin extends Plugin {
       callback: () => this.engine.seekBy(this.settings.skipSeconds)
     });
 
+    // NOT Alt+↑/↓: Obsidian's editor binds those to "move line up/down" in its
+    // CodeMirror keymap, which fires first — so they would quietly do nothing
+    // while the cursor is in a note. Alt+PageUp/PageDown are free (checked
+    // against the app's own keymap), as are Alt+Home/End for a reset.
+    this.addCommand({
+      id: "transpose-up",
+      name: "Transpose up a semitone",
+      hotkeys: [{ modifiers: ["Alt"], key: "PageUp" }],
+      callback: () => void this.engine.setSemitones(this.engine.semitones + 1)
+    });
+
+    this.addCommand({
+      id: "transpose-down",
+      name: "Transpose down a semitone",
+      hotkeys: [{ modifiers: ["Alt"], key: "PageDown" }],
+      callback: () => void this.engine.setSemitones(this.engine.semitones - 1)
+    });
+
+
+    this.addCommand({
+      id: "rate-up",
+      name: "Play faster",
+      hotkeys: [{ modifiers: ["Alt"], key: "=" }],
+      callback: () => this.engine.stepRate(1)
+    });
+
+    this.addCommand({
+      id: "rate-down",
+      name: "Play slower",
+      hotkeys: [{ modifiers: ["Alt"], key: "-" }],
+      callback: () => this.engine.stepRate(-1)
+    });
+
+    this.addCommand({
+      id: "rate-reset",
+      name: "Play as recorded (reset speed and key)",
+      hotkeys: [{ modifiers: ["Alt"], key: "0" }],
+      callback: () => {
+        this.engine.setRate(1);
+        // guarded: on mobile setSemitones only reports that it is unavailable
+        if (this.engine.semitones !== 0) void this.engine.setSemitones(0);
+      }
+    });
+
+    this.addCommand({
+      id: "save-transposed-copy",
+      name: "Save a copy in the chosen key",
+      callback: () => void this.saveTransposedCopy()
+    });
+
+    this.addCommand({
+      id: "analyse-track",
+      name: "Measure tempo and key of the current track",
+      callback: () => {
+        const file = this.engine.file;
+        if (!file) {
+          new Notice(t("noTrack"));
+          return;
+        }
+        void this.analyseTrack(file, true);
+      }
+    });
+
     this.addCommand({
       id: "next-track",
       name: "Next track in the playlist",
@@ -193,6 +258,11 @@ export default class SongwriterPlugin extends Plugin {
         revealInExplorer(this.app, file);
       }
     });
+
+    // measuring a freshly loaded track: off the UI thread, cached, once
+    this.registerEvent(this.engine.on("track-changed", (file: TFile | null) => {
+      if (file && this.settings.autoAnalyse) void this.analyseTrack(file);
+    }));
 
     this.registerEvent(this.app.workspace.on("file-open", (file) => this.handleFileOpen(file)));
 
@@ -367,6 +437,112 @@ export default class SongwriterPlugin extends Plugin {
     await this.engine.load(isAudio ? active : audios[0]);
   }
 
+  // ---- tempo & key ----
+
+  private analysing = new Set<string>();
+
+  isAnalysing(path: string): boolean {
+    return this.analysing.has(path);
+  }
+
+  trackData(path: string): TrackData {
+    let d = this.settings.tracks[path];
+    if (!d) {
+      d = emptyTrackData();
+      this.settings.tracks[path] = d;
+    }
+    return d;
+  }
+
+  /**
+   * Measure tempo and key in a worker and remember them. Runs once per file:
+   * a stored result, and any hand correction, is left alone unless forced.
+   */
+  async analyseTrack(file: TFile, force = false): Promise<void> {
+    const path = file.path;
+    if (this.analysing.has(path)) return;
+    const stored = this.settings.tracks[path];
+    if (!force && (stored?.musicalEdited || stored?.bpm != null)) return;
+
+    this.analysing.add(path);
+    this.engine.trigger("data-changed"); // shows the pending state
+    try {
+      const result = await analyseMusical(this.app, file, this.settings.tempoWindowLow);
+      if (!result) {
+        new Notice(t("analyseFailed")(file.basename));
+        return;
+      }
+      const d = this.trackData(path);
+      d.bpm = result.bpm;
+      d.key = result.key;
+      d.scale = result.scale;
+      d.scaleAlt = result.scaleAlt;
+      d.keyVotes = result.keyVotes;
+      d.musicalEdited = false;
+      this.requestSave();
+    } catch (e) {
+      console.warn("Songwriter: analysis failed", e);
+      new Notice(t("analyseFailed")(file.basename));
+    } finally {
+      this.analysing.delete(path);
+      this.engine.trigger("data-changed");
+    }
+  }
+
+  /**
+   * Write what is being heard — transposition and speed baked in — as a new
+   * file next to the original, named after the change.
+   */
+  async saveTransposedCopy(): Promise<void> {
+    const file = this.engine.file;
+    if (!file) {
+      new Notice(t("noTrack"));
+      return;
+    }
+    const semitones = this.engine.semitones;
+    const rate = this.engine.rate;
+    if (semitones === 0 && Math.abs(rate - 1) < 0.001) {
+      new Notice(t("renderNothing"));
+      return;
+    }
+    const opts = { semitones, rate, bpm: this.engine.peekData()?.bpm ?? null };
+    const notice = new Notice(t("renderWorking")(renderedName(file.basename, opts)), 0);
+    try {
+      const created = await renderTransposed(this.app, file, opts);
+      notice.hide();
+      new Notice(t("renderDone")(created.basename), 6000);
+      // a folder playlist should show the new neighbour right away
+      if (this.engine.queueSource?.kind === "folder" && created.parent?.path === file.parent?.path) {
+        this.engine.setQueue(this.collectFolderAudios(file), this.engine.queueSource);
+      }
+    } catch (e) {
+      notice.hide();
+      console.warn("Songwriter: render failed", e);
+      new Notice(t("renderFailed"));
+    }
+  }
+
+  /** Hand corrections (×2, ÷2, the other mode) stick for good. */
+  editMusical(path: string, patch: Partial<TrackData>) {
+    const d = this.trackData(path);
+    Object.assign(d, patch, { musicalEdited: true });
+    this.requestSave();
+    this.engine.trigger("data-changed");
+  }
+
+  forgetMusical(path: string) {
+    const d = this.settings.tracks[path];
+    if (!d) return;
+    d.bpm = null;
+    d.key = null;
+    d.scale = null;
+    d.scaleAlt = null;
+    d.keyVotes = undefined;
+    d.musicalEdited = false;
+    this.requestSave();
+    this.engine.trigger("data-changed");
+  }
+
   /** Jump back to the note the current track was picked up from. */
   async openTrackNote() {
     const file = this.engine.file;
@@ -452,6 +628,16 @@ export default class SongwriterPlugin extends Plugin {
         loopB: raw.loopB ?? null,
         plays: typeof raw.plays === "number" ? raw.plays : 0,
         playedSec: typeof raw.playedSec === "number" ? raw.playedSec : 0,
+        // measurements follow the current preferred range: changing it re-folds
+        // everything that was not corrected by hand
+        bpm: raw.bpm != null && !raw.musicalEdited
+          ? Math.round(foldIntoWindow(raw.bpm, this.settings.tempoWindowLow))
+          : raw.bpm ?? null,
+        key: raw.key ?? null,
+        scale: raw.scale ?? null,
+        scaleAlt: raw.scaleAlt ?? null,
+        keyVotes: raw.keyVotes,
+        musicalEdited: raw.musicalEdited
       };
     }
   }
@@ -467,7 +653,10 @@ export default class SongwriterPlugin extends Plugin {
   async saveSettings() {
     for (const [path, d] of Object.entries(this.settings.tracks)) {
       const noStats = !d.plays && (d.playedSec ?? 0) < 5;
-      if (d.marker === null && d.loopA === null && noStats) {
+      // measured tempo/key counts as content too — it costs seconds of
+      // analysis to get back, so an otherwise empty record must survive
+      const noMusical = d.bpm == null && d.key == null;
+      if (d.marker === null && d.loopA === null && noStats && noMusical) {
         delete this.settings.tracks[path];
       }
     }
@@ -543,6 +732,33 @@ class SongwriterSettingTab extends PluginSettingTab {
           this.plugin.settings.autoAdvance = value;
           await this.plugin.saveSettings();
         }));
+
+    new Setting(containerEl).setName(t("headingMusical")).setHeading();
+
+    new Setting(containerEl)
+      .setName(t("setAutoAnalyseName"))
+      .setDesc(t("setAutoAnalyseDesc"))
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.autoAnalyse)
+        .onChange(async (value) => {
+          this.plugin.settings.autoAnalyse = value;
+          await this.plugin.saveSettings();
+        }));
+
+    const windowSetting = new Setting(containerEl).setName(t("setTempoWindowName"));
+    const describeWindow = () => windowSetting.setDesc(
+      t("setTempoWindowDesc")(this.plugin.settings.tempoWindowLow, this.plugin.settings.tempoWindowLow * 2 - 1)
+    );
+    describeWindow();
+    windowSetting.addSlider(slider => slider
+      .setLimits(40, 120, 5)
+      .setDynamicTooltip()
+      .setValue(this.plugin.settings.tempoWindowLow)
+      .onChange(async (value) => {
+        this.plugin.settings.tempoWindowLow = value;
+        describeWindow();
+        await this.plugin.saveSettings();
+      }));
 
     new Setting(containerEl).setName(t("headingFine")).setHeading();
 

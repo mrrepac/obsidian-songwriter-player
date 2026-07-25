@@ -62,6 +62,37 @@ const en = {
   playlistCountTitle: (n: number) => `${n} audio files`,
   rowMarkerTitle: "The track has a marker",
 
+  // tempo & key
+  analyseHint: "Tempo and key are not measured yet — click to measure",
+  analysing: "Measuring tempo and key…",
+  analyseFailed: (name: string) => `Songwriter: could not analyse “${name}”.`,
+  musicalTitle: (votes: string, edited: boolean) =>
+    edited ? `Tempo and key, corrected by hand · click for options` : `Tempo and key · ${votes} · click for options`,
+  votesUnanimous: "all key profiles agree",
+  votesSplit: (n: number, total: number, alt: string) => `${n} of ${total} profiles, the rest say ${alt}`,
+  menuDouble: "Tempo ×2",
+  menuHalf: "Tempo ÷2",
+  rateTitle: "Playback speed — the key stays where it is (Alt+- / Alt+= / Alt+0)",
+  rateTitleBpm: (now: number, original: number, factor: string) =>
+    `Playing at ${now} BPM instead of ${original} (${factor}×) — the key stays where it is. Alt+- / Alt+= step by one bpm, Alt+0 resets.`,
+  rateOriginal: (label: string) => `${label} — as recorded`,
+  pitchTitle: "Transpose without changing the tempo, desktop only (Alt+PageUp / Alt+PageDown)",
+  pitchTitleKey: (now: string, original: string) =>
+    `Playing in ${now} instead of ${original}, the tempo is untouched. Alt+PageUp and Alt+PageDown move by a semitone, Alt+0 resets.`,
+  pitchOriginal: (label: string) => `${label} — as recorded`,
+  pitchUnavailable: "Songwriter: transposing is unavailable here.",
+  menuSaveCopy: (name: string) => `Save a copy: ${name}.wav`,
+  renderWorking: (name: string) => `Rendering ${name}.wav…`,
+  renderDone: (name: string) => `Saved: ${name}.wav`,
+  renderNothing: "Songwriter: nothing to bake in — the key and the speed are as recorded.",
+  renderFailed: "Songwriter: could not save the copy.",
+  menuListen: (label: string) => `Listen: ${label}`,
+  menuSwitchMode: (alt: string) => `Switch to ${alt}`,
+  menuReanalyse: "Measure again",
+  menuForget: "Forget tempo and key",
+  modeMajor: "major",
+  modeMinor: "minor",
+
   waveLoading: "Analyzing waveform…",
 
   // listened-time units (47s · 12m · 2h05m)
@@ -87,6 +118,13 @@ const en = {
   setAutoAdvanceName: "Play the playlist through",
   setAutoAdvanceDesc:
     "When a track ends, the next one in the playlist starts. The last track just stops. A track with an A-B zone keeps looping and never advances.",
+  headingMusical: "Tempo and key",
+  setAutoAnalyseName: "Measure a track when it loads",
+  setAutoAnalyseDesc:
+    "Tempo and key are measured once per file and remembered. It takes a few seconds in the background — playback and typing are not affected. Off: measure by hand from the tempo badge or the command.",
+  setTempoWindowName: "Preferred tempo range",
+  setTempoWindowDesc: (low: number, high: number) =>
+    `Whether a beat is heard at ${low} or at ${low * 2} is a matter of feel, so the measured tempo is halved or doubled into ${low}–${high} — exactly one octave, so every tempo lands on a single value. ×2 and ÷2 on the badge still override it for a given track.`,
   headingFine: "Fine tuning",
   setPlayCountName: "Play-count threshold",
   setPlayCountDesc: "How many seconds must actually sound for a run to land in the play counter.",
@@ -154,6 +192,36 @@ const ru: typeof en = {
   playlistCountTitle: (n: number) => `Аудиофайлов: ${n}`,
   rowMarkerTitle: "У трека есть маркер",
 
+  analyseHint: "Темп и тональность ещё не измерены — нажми, чтобы измерить",
+  analysing: "Считаю темп и тональность…",
+  analyseFailed: (name: string) => `Songwriter: не удалось разобрать «${name}».`,
+  musicalTitle: (votes: string, edited: boolean) =>
+    edited ? "Темп и тональность, исправлены вручную · клик — меню" : `Темп и тональность · ${votes} · клик — меню`,
+  votesUnanimous: "все профили согласны",
+  votesSplit: (n: number, total: number, alt: string) => `${n} профиля из ${total}, остальные за ${alt}`,
+  menuDouble: "Темп ×2",
+  menuHalf: "Темп ÷2",
+  rateTitle: "Скорость воспроизведения — тональность остаётся на месте (Alt+- / Alt+= / Alt+0)",
+  rateTitleBpm: (now: number, original: number, factor: string) =>
+    `Играет на ${now} BPM вместо ${original} (${factor}×) — тональность остаётся на месте. Alt+- и Alt+= меняют на один bpm, Alt+0 возвращает.`,
+  rateOriginal: (label: string) => `${label} — как записано`,
+  pitchTitle: "Транспонировать, не меняя темп; только на компьютере (Alt+PageUp / Alt+PageDown)",
+  pitchTitleKey: (now: string, original: string) =>
+    `Играет в ${now} вместо ${original}, темп не тронут. Alt+PageUp и Alt+PageDown — на полутон, Alt+0 сбрасывает.`,
+  pitchOriginal: (label: string) => `${label} — как записано`,
+  pitchUnavailable: "Songwriter: транспонирование здесь недоступно.",
+  menuSaveCopy: (name: string) => `Сохранить копию: ${name}.wav`,
+  renderWorking: (name: string) => `Считаю ${name}.wav…`,
+  renderDone: (name: string) => `Сохранено: ${name}.wav`,
+  renderNothing: "Songwriter: запекать нечего — тональность и скорость как в записи.",
+  renderFailed: "Songwriter: не удалось сохранить копию.",
+  menuListen: (label: string) => `Послушать: ${label}`,
+  menuSwitchMode: (alt: string) => `Переключить на ${alt}`,
+  menuReanalyse: "Измерить заново",
+  menuForget: "Забыть темп и тональность",
+  modeMajor: "мажор",
+  modeMinor: "минор",
+
   waveLoading: "Анализ волны…",
 
   unitS: "с",
@@ -177,6 +245,13 @@ const ru: typeof en = {
   setAutoAdvanceName: "Играть плейлист подряд",
   setAutoAdvanceDesc:
     "Когда трек доиграл, включается следующий из плейлиста. После последнего плеер просто останавливается. Трек с зоной A-B продолжает крутиться и никуда не переключается.",
+  headingMusical: "Темп и тональность",
+  setAutoAnalyseName: "Измерять трек при загрузке",
+  setAutoAnalyseDesc:
+    "Темп и тональность считаются один раз на файл и запоминаются. Занимает несколько секунд в фоне — воспроизведение и набор текста не тормозят. Выключено — считать вручную, из плашки с темпом или командой.",
+  setTempoWindowName: "Предпочтительный диапазон темпа",
+  setTempoWindowDesc: (low: number, high: number) =>
+    `Слышится бит на ${low} или на ${low * 2} — вопрос ощущения, поэтому измеренный темп сам делится или умножается вдвое и попадает в ${low}–${high}. Это ровно одна октава, так что любой темп даёт единственное значение. Кнопки ×2 и ÷2 в плашке всё равно перебивают это для отдельного трека.`,
   headingFine: "Тонкая настройка",
   setPlayCountName: "Порог зачёта прогона",
   setPlayCountDesc: "Сколько секунд должно реально прозвучать, чтобы прогон попал в счётчик проигрываний.",

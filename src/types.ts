@@ -6,6 +6,22 @@ export interface TrackData {
   loopB: number | null;
   plays: number;
   playedSec: number;
+  /** measured tempo, rounded; null until the track has been analysed */
+  bpm?: number | null;
+  /** tonic, e.g. "F#" */
+  key?: string | null;
+  /** "major" | "minor" */
+  scale?: string | null;
+  /** the mode the profiles disagreed about, if they did */
+  scaleAlt?: string | null;
+  /** how many key profiles backed the winner */
+  keyVotes?: number;
+  /** hand-corrected: analysis must never overwrite it again */
+  musicalEdited?: boolean;
+  /** playback speed for this track, 1 = as recorded (pitch is preserved) */
+  rate?: number;
+  /** transposition in semitones, desktop only; undefined = as recorded */
+  semitones?: number;
 }
 
 export function emptyTrackData(): TrackData {
@@ -45,6 +61,9 @@ export interface SongwriterSettings {
   folderQueue: boolean;
   autoAdvance: boolean;
   playlistCollapsed: boolean;
+  autoAnalyse: boolean;
+  /** lower edge of the preferred tempo octave: 80 means 80…159 */
+  tempoWindowLow: number;
   tracks: Record<string, TrackData>;
 }
 
@@ -63,8 +82,16 @@ export const DEFAULT_SETTINGS: SongwriterSettings = {
   folderQueue: true,
   autoAdvance: false,
   playlistCollapsed: false,
+  autoAnalyse: true,
+  tempoWindowLow: 80,
   tracks: {}
 };
+
+/** "F# minor" → "F#m", "F# major" → "F#" — the notation a songwriter writes down. */
+export function formatKey(key?: string | null, scale?: string | null): string {
+  if (!key) return "";
+  return scale === "minor" ? `${key}m` : key;
+}
 
 export const AUDIO_EXTENSIONS = ["mp3", "wav", "m4a", "ogg", "wma", "flac", "aac", "webm", "opus", "3gp"];
 
