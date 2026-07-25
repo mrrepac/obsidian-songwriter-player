@@ -21,6 +21,20 @@ interface LegacySettings extends Partial<Omit<SongwriterSettings, "tracks">> {
   rate?: number;
 }
 
+/** Stored speed, clamped to what the engine can set; "as recorded" stays undefined. */
+function restoreRate(rate: unknown): number | undefined {
+  if (typeof rate !== "number" || !isFinite(rate)) return undefined;
+  const r = Math.min(PlayerEngine.RATE_MAX, Math.max(PlayerEngine.RATE_MIN, rate));
+  return Math.abs(r - 1) < 0.001 ? undefined : r;
+}
+
+/** Stored transposition, clamped to ±12 semitones; "as recorded" stays undefined. */
+function restoreSemitones(semitones: unknown): number | undefined {
+  if (typeof semitones !== "number" || !isFinite(semitones)) return undefined;
+  const n = Math.max(-12, Math.min(12, Math.round(semitones)));
+  return n === 0 ? undefined : n;
+}
+
 export default class SongwriterPlugin extends Plugin {
   settings: SongwriterSettings;
   engine: PlayerEngine;
@@ -333,6 +347,8 @@ export default class SongwriterPlugin extends Plugin {
     let target: TFile;
     /** An audio file was opened by hand: that exact file wins over the queue. */
     let explicit: boolean;
+    /** The note the target would belong to — applied only if it actually loads. */
+    let noteSource: TFile | null;
 
     if (isAudioPath(file.path)) {
       audios = this.settings.folderQueue ? this.collectFolderAudios(file) : [file];
@@ -341,7 +357,7 @@ export default class SongwriterPlugin extends Plugin {
         : null;
       target = file;
       explicit = true;
-      this.engine.sourceNote = null;
+      noteSource = null;
     } else if (file.extension === "md") {
       audios = this.collectNoteAudios(file);
       if (audios.length === 0) {
@@ -350,7 +366,7 @@ export default class SongwriterPlugin extends Plugin {
         this.engine.setPendingSwitch(null);
         return;
       }
-      this.engine.sourceNote = file;
+      noteSource = file;
       source = { kind: "note", name: file.basename, path: file.path };
       target = audios[0];
       explicit = false;
@@ -372,13 +388,16 @@ export default class SongwriterPlugin extends Plugin {
       return;
     }
 
+    // the note association travels with the load, so merely opening a file
+    // that does not become the track (manual mode, an offer left unanswered,
+    // the track already playing) leaves "open track's note" pointing where it did
     switch (this.settings.pickupMode) {
       case "auto":
-        void this.engine.load(target, { autoplay: this.engine.playing });
+        void this.engine.load(target, { autoplay: this.engine.playing, sourceNote: noteSource });
         break;
       case "hybrid":
-        if (this.engine.playing) this.engine.setPendingSwitch(target);
-        else void this.engine.load(target);
+        if (this.engine.playing) this.engine.setPendingSwitch(target, noteSource);
+        else void this.engine.load(target, { sourceNote: noteSource });
         break;
       case "manual":
         break;
@@ -433,8 +452,9 @@ export default class SongwriterPlugin extends Plugin {
         ? { kind: "folder", name: active.parent.name || "/", path: active.parent.path }
         : null)
       : { kind: "note", name: active.basename, path: active.path });
-    this.engine.sourceNote = active.extension === "md" ? active : null;
-    await this.engine.load(isAudio ? active : audios[0]);
+    await this.engine.load(isAudio ? active : audios[0], {
+      sourceNote: active.extension === "md" ? active : null
+    });
   }
 
   // ---- tempo & key ----
@@ -637,7 +657,12 @@ export default class SongwriterPlugin extends Plugin {
         scale: raw.scale ?? null,
         scaleAlt: raw.scaleAlt ?? null,
         keyVotes: raw.keyVotes,
-        musicalEdited: raw.musicalEdited
+        musicalEdited: raw.musicalEdited,
+        // speed and transposition are deliberately per track — a beat you are
+        // learning stays slow, a song stays in the key you sing it in — so they
+        // have to be restored here, not just written
+        rate: restoreRate(raw.rate),
+        semitones: restoreSemitones(raw.semitones)
       };
     }
   }
@@ -656,7 +681,10 @@ export default class SongwriterPlugin extends Plugin {
       // measured tempo/key counts as content too — it costs seconds of
       // analysis to get back, so an otherwise empty record must survive
       const noMusical = d.bpm == null && d.key == null;
-      if (d.marker === null && d.loopA === null && noStats && noMusical) {
+      // so does a chosen speed or key: they are the whole point of the record
+      // for a track being practised, even before it has a marker or a play
+      const noPlayback = d.rate === undefined && d.semitones === undefined;
+      if (d.marker === null && d.loopA === null && noStats && noMusical && noPlayback) {
         delete this.settings.tracks[path];
       }
     }

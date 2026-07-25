@@ -1,0 +1,25 @@
+name: Build
+
+# The release workflow only runs on a tag, so until now a type error or a
+# broken bundle first showed up while cutting a release. This runs the same
+# build on every push and pull request instead.
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Type-check and bundle
+        run: |
+          npm ci
+          npm run build

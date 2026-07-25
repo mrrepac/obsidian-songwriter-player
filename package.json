@@ -1,6 +1,6 @@
 {
   "name": "songwriter-player",
-  "version": "1.2.0",
+  "version": "1.4.1",
   "description": "Obsidian plugin: advanced sidebar audio player for songwriting.",
   "main": "main.js",
   "scripts": {
@@ -13,7 +13,7 @@
     "songwriting"
   ],
   "author": "mrrepac",
-  "license": "MIT",
+  "license": "AGPL-3.0-or-later",
   "devDependencies": {
     "@types/node": "^16.11.6",
     "esbuild": "0.17.3",

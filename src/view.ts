@@ -25,7 +25,18 @@ export class SongwriterView extends ItemView {
   private playlistTitle: HTMLElement;
   private playlistCount: HTMLElement;
   private playlistChevron: HTMLElement;
-  private playlistRows = new Map<string, { flag: HTMLElement; plays: HTMLElement; musical: HTMLElement }>();
+  private playlistRows = new Map<string, {
+    row: HTMLElement;
+    num: HTMLElement;
+    index: number;
+    flag: HTMLElement;
+    plays: HTMLElement;
+    musical: HTMLElement;
+  }>();
+  /** Paths currently laid out, so an unchanged playlist is never rebuilt. */
+  private renderedPaths: string[] = [];
+  /** The row marked as playing, so a track change touches two rows, not all. */
+  private currentRowPath: string | null = null;
   private musicalEl: HTMLElement | null = null;
   private rateEl: HTMLElement;
   private pitchEl: HTMLElement | null = null;
@@ -482,7 +493,7 @@ export class SongwriterView extends ItemView {
     });
     const switchBtn = this.pendingRow.createEl("button", { text: t("switchBtn") });
     switchBtn.addEventListener("click", () => {
-      void this.engine.load(pending, { autoplay: this.engine.playing });
+      void this.engine.acceptPendingSwitch();
     });
     const closeBtn = this.pendingRow.createEl("button", { cls: "clickable-icon sw-icon-btn" });
     setIcon(closeBtn, "x");
@@ -524,7 +535,13 @@ export class SongwriterView extends ItemView {
     const source = this.engine.queueSource;
     // a lone track is not a playlist — the track row already says everything
     this.playlistEl.toggle(queue.length > 1);
-    if (queue.length <= 1) return;
+    if (queue.length <= 1) {
+      this.playlistList.empty();
+      this.playlistRows.clear(); // the rows are gone; don't keep writing to them
+      this.renderedPaths = [];
+      this.currentRowPath = null;
+      return;
+    }
 
     setIcon(this.playlistIcon, source?.kind === "folder" ? "folder" : "file-text");
     this.playlistTitle.setText(source?.name ?? "");
@@ -535,21 +552,32 @@ export class SongwriterView extends ItemView {
     this.playlistCount.title = t("playlistCountTitle")(queue.length);
     this.applyPlaylistCollapsed();
 
+    // Rebuilding the rows throws away the list's scroll position, so it only
+    // happens when the playlist itself changed. Stepping to the next track
+    // leaves the DOM alone and just moves the highlight — otherwise every ⏭
+    // through a folder would snap the view back to the first file.
+    const paths = queue.map(f => f.path);
+    const same = paths.length === this.renderedPaths.length
+      && paths.every((p, i) => p === this.renderedPaths[i]);
+    if (!same) {
+      this.buildPlaylistRows(queue);
+      this.renderedPaths = paths;
+    }
+    this.updatePlaylistCurrent();
+  }
+
+  private buildPlaylistRows(queue: TFile[]) {
     this.playlistList.empty();
     this.playlistRows.clear();
-    const currentPath = this.engine.file?.path;
-    queue.forEach((f, i) => {
+    this.currentRowPath = null; // fresh rows: nothing is highlighted yet
+    queue.forEach((f, index) => {
       const row = this.playlistList.createDiv({ cls: "sw-pl-row" });
-      const isCurrent = f.path === currentPath;
-      if (isCurrent) row.addClass("is-current");
-      const num = row.createSpan({ cls: "sw-pl-num" });
-      if (isCurrent) setIcon(num, this.engine.playing ? "volume-2" : "pause");
-      else num.setText(String(i + 1));
+      const num = row.createSpan({ cls: "sw-pl-num", text: String(index + 1) });
       row.createSpan({ cls: "sw-pl-name", text: f.basename, title: f.path });
       const flag = row.createSpan({ cls: "sw-pl-flag" });
       const musical = row.createSpan({ cls: "sw-pl-musical" });
       const plays = row.createSpan({ cls: "sw-pl-plays" });
-      this.playlistRows.set(f.path, { flag, plays, musical });
+      this.playlistRows.set(f.path, { row, num, index, flag, plays, musical });
       this.fillPlaylistRow(f.path);
       row.addEventListener("click", () => {
         if (f.path === this.engine.file?.path) void this.engine.playPause();
@@ -557,6 +585,46 @@ export class SongwriterView extends ItemView {
       });
       this.makeRowDraggable(row, f);
     });
+  }
+
+  /** Move the "now playing" highlight in place, and keep that row in sight. */
+  private updatePlaylistCurrent() {
+    this.updateQueueButtons();
+    const currentPath = this.engine.file?.path ?? null;
+    if (currentPath === this.currentRowPath) return;
+
+    const prev = this.currentRowPath ? this.playlistRows.get(this.currentRowPath) : null;
+    if (prev) {
+      prev.row.removeClass("is-current");
+      prev.num.empty();
+      prev.num.setText(String(prev.index + 1)); // back to its ordinal
+    }
+    this.currentRowPath = currentPath;
+
+    // a track can be loaded without belonging to the playlist — then there is
+    // simply no row to light up
+    const els = currentPath ? this.playlistRows.get(currentPath) : null;
+    if (!els) return;
+    els.row.addClass("is-current");
+    els.num.empty();
+    setIcon(els.num, this.engine.playing ? "volume-2" : "pause");
+    this.scrollRowIntoView(els.row);
+  }
+
+  /**
+   * Scroll the list itself — not via scrollIntoView, which would also pull the
+   * whole sidebar around when the panel is short.
+   */
+  private scrollRowIntoView(row: HTMLElement) {
+    const list = this.playlistList;
+    const listRect = list.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    if (listRect.height === 0) return; // collapsed or not laid out yet
+    if (rowRect.top < listRect.top) {
+      list.scrollTop -= listRect.top - rowRect.top;
+    } else if (rowRect.bottom > listRect.bottom) {
+      list.scrollTop += rowRect.bottom - listRect.bottom;
+    }
   }
 
   /**
@@ -602,8 +670,12 @@ export class SongwriterView extends ItemView {
   private updatePlayButton() {
     if (!this.playBtn) return;
     setIcon(this.playBtn, this.engine.playing ? "pause" : "play");
-    const num = this.playlistList?.querySelector<HTMLElement>(".sw-pl-row.is-current .sw-pl-num");
-    if (num) setIcon(num, this.engine.playing ? "volume-2" : "pause");
+    const path = this.engine.file?.path;
+    const els = path ? this.playlistRows.get(path) : null;
+    if (els) {
+      els.num.empty();
+      setIcon(els.num, this.engine.playing ? "volume-2" : "pause");
+    }
   }
 
   private lastTimeText = "";

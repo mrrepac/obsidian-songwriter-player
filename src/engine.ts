@@ -142,7 +142,11 @@ export class PlayerEngine extends Events {
   // <audio>) can detect it was superseded and bail before touching state.
   private loadToken = 0;
 
-  async load(file: TFile, opts: { autoplay?: boolean } = {}) {
+  async load(file: TFile, opts: { autoplay?: boolean; sourceNote?: TFile | null } = {}) {
+    // An omitted sourceNote means "leave the note association alone": stepping
+    // through a playlist stays inside the note the playlist came from, while a
+    // pickup states explicitly which note (or none) the new track belongs to.
+    if (opts.sourceNote !== undefined) this.sourceNote = opts.sourceNote;
     if (this.file?.path === file.path) {
       this.setPendingSwitch(null);
       if (opts.autoplay && !this.playing) await this.safePlay();
@@ -505,19 +509,23 @@ export class PlayerEngine extends Events {
     if (this.playing) {
       const delta = t - this.lastLoopTime;
       if (delta > 0 && delta < 2) {
+        // currentTime advances at playbackRate, so convert back to real
+        // seconds: an hour spent practising at 0.5× is an hour of listening,
+        // and "count a play after 5 seconds" means 5 seconds by the clock
+        const elapsed = delta / (this.audio.playbackRate || 1);
         const d = this.ensureData(); // count from the very first second of a fresh track
         if (d) {
-          d.playedSec = (d.playedSec ?? 0) + delta;
+          d.playedSec = (d.playedSec ?? 0) + elapsed;
           // don't spam saveData 4x/sec: persist every ~30s of playback,
           // pause/stop/track-change flush the rest
-          this.unsavedPlayedSec += delta;
+          this.unsavedPlayedSec += elapsed;
           if (this.unsavedPlayedSec >= 30) {
             this.unsavedPlayedSec = 0;
             this.plugin.requestSave();
           }
         }
         if (this.pendingPlaySec !== null) {
-          this.pendingPlaySec -= delta;
+          this.pendingPlaySec -= elapsed;
           if (this.pendingPlaySec <= 0) {
             this.pendingPlaySec = null;
             this.bumpPlays();
@@ -587,10 +595,21 @@ export class PlayerEngine extends Events {
     return !!this.queue[i + delta];
   }
 
-  setPendingSwitch(file: TFile | null) {
+  /** The note the offered track would be picked up from, held until accepted. */
+  private pendingSourceNote: TFile | null = null;
+
+  setPendingSwitch(file: TFile | null, sourceNote: TFile | null = null) {
+    this.pendingSourceNote = file ? sourceNote : null;
     if (this.pendingSwitch === file) return;
     this.pendingSwitch = file;
     this.trigger("pending-switch", file);
+  }
+
+  /** Take the offered switch, with the note association the pickup had in mind. */
+  async acceptPendingSwitch() {
+    const file = this.pendingSwitch;
+    if (!file) return;
+    await this.load(file, { autoplay: this.playing, sourceNote: this.pendingSourceNote });
   }
 
   destroy() {

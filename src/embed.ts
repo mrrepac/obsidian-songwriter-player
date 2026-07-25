@@ -1,4 +1,4 @@
-import { EventRef, TFile, setIcon } from "obsidian";
+import { EventRef, MarkdownView, TFile, setIcon } from "obsidian";
 import type SongwriterPlugin from "./main";
 import { t } from "./i18n";
 import { EXT_BTN_TITLE, openExternally, revealInExplorer } from "./external";
@@ -42,9 +42,11 @@ export class EmbedPlayers {
           }
         });
       }
-      // an embed re-render replaces its <audio> with a fresh node, orphaning
+      // An embed re-render replaces its <audio> with a fresh node, orphaning
       // our widget — reap the detached ones so their listeners/rAF don't leak.
-      this.pruneDetached();
+      // This observer sees every DOM change in the app, including each keystroke
+      // in the editor, so the sweep is collapsed to once per frame.
+      this.schedulePrune();
     });
     this.observer.observe(this.doc.body, { childList: true, subtree: true });
   }
@@ -63,6 +65,16 @@ export class EmbedPlayers {
     this.doc.body.findAll("audio").forEach((a) => this.process(a as HTMLAudioElement));
   }
 
+  private pruneScheduled = 0;
+
+  private schedulePrune() {
+    if (this.pruneScheduled !== 0 || this.widgets.size === 0) return;
+    this.pruneScheduled = window.requestAnimationFrame(() => {
+      this.pruneScheduled = 0;
+      this.pruneDetached();
+    });
+  }
+
   private pruneDetached() {
     for (const w of this.widgets) {
       if (!w.isConnected()) {
@@ -72,13 +84,30 @@ export class EmbedPlayers {
     }
   }
 
+  /**
+   * The note this <audio> is rendered in — not necessarily the active file. In
+   * a split, a background leaf or a hover preview the active file is a
+   * different note, and a link like "take 2.mp3" would then resolve against the
+   * wrong folder. Falls back to the active file when no leaf claims the node.
+   */
+  private hostPath(audio: HTMLAudioElement): string {
+    let path: string | null = null;
+    this.plugin.app.workspace.iterateAllLeaves((leaf) => {
+      if (path !== null) return;
+      const view = leaf.view;
+      if (view instanceof MarkdownView && view.file && view.containerEl.contains(audio)) {
+        path = view.file.path;
+      }
+    });
+    return path ?? this.plugin.app.workspace.getActiveFile()?.path ?? "";
+  }
+
   resolveFile(audio: HTMLAudioElement): TFile | null {
     const embed = audio.closest(".internal-embed");
     let src = embed ? embed.getAttribute("src") : audio.getAttribute("src");
     if (!src) return null;
     src = src.split("#")[0];
-    const active = this.plugin.app.workspace.getActiveFile();
-    return this.plugin.app.metadataCache.getFirstLinkpathDest(src, active ? active.path : "");
+    return this.plugin.app.metadataCache.getFirstLinkpathDest(src, this.hostPath(audio));
   }
 
   private process(audio: HTMLAudioElement) {
@@ -147,6 +176,10 @@ export class EmbedPlayers {
   destroy() {
     this.observer?.disconnect();
     this.observer = null;
+    if (this.pruneScheduled !== 0) {
+      window.cancelAnimationFrame(this.pruneScheduled);
+      this.pruneScheduled = 0;
+    }
     this.teardownAll();
     this.doc.body.classList.remove("sw-hide-embed-buttons");
     this.docRef = null;
