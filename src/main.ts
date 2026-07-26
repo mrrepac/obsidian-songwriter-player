@@ -1,4 +1,4 @@
-import { App, MarkdownView, Notice, Platform, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf } from "obsidian";
+import { App, Hotkey, MarkdownView, Notice, Platform, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf } from "obsidian";
 import { DEFAULT_SETTINGS, QueueSource, SongwriterSettings, TrackData, emptyTrackData, isAudioPath } from "./types";
 import { analyseMusical, foldIntoWindow } from "./musical";
 import { renderTransposed, renderedName } from "./render";
@@ -44,6 +44,24 @@ export default class SongwriterPlugin extends Plugin {
   mediaSession: MediaSessionBridge;
   private saveTimer: number | null = null;
 
+  /**
+   * Default hotkeys are offered, not imposed.
+   *
+   * Up to 1.5.1 every command shipped with keys baked in, which drops one
+   * person's layout onto every keyboard — and this layout is deliberately
+   * personal, down to the Russian twin of each letter binding. With the setting
+   * off the commands register bare and are still reachable from the command
+   * palette, or from whatever the user binds them to. An assignment made in
+   * Obsidian's own hotkey settings always beats a default either way, so this
+   * only decides what a command starts out with.
+   *
+   * Commands are registered once, at load, so a change takes effect when the
+   * plugin is reloaded.
+   */
+  private keys(...hotkeys: Hotkey[]): Hotkey[] {
+    return this.settings.defaultHotkeys ? hotkeys : [];
+  }
+
   async onload() {
     await this.loadSettings();
     this.engine = new PlayerEngine(this);
@@ -67,40 +85,28 @@ export default class SongwriterPlugin extends Plugin {
     this.addCommand({
       id: "play-pause",
       name: "Play/Pause",
-      hotkeys: [
-        { modifiers: ["Alt"], key: "p" },
-        { modifiers: ["Alt"], key: "з" }
-      ],
+      hotkeys: this.keys({ modifiers: ["Alt"], key: "p" }, { modifiers: ["Alt"], key: "з" }),
       callback: () => this.engine.playPause()
     });
 
     this.addCommand({
       id: "play-from-marker",
       name: "Play from marker (or from start)",
-      hotkeys: [
-        { modifiers: ["Alt"], key: "x" },
-        { modifiers: ["Alt"], key: "ч" }
-      ],
+      hotkeys: this.keys({ modifiers: ["Alt"], key: "x" }, { modifiers: ["Alt"], key: "ч" }),
       callback: () => this.engine.playFromMarker()
     });
 
     this.addCommand({
       id: "stop",
       name: "Stop",
-      hotkeys: [
-        { modifiers: ["Alt"], key: "c" },
-        { modifiers: ["Alt"], key: "с" }
-      ],
+      hotkeys: this.keys({ modifiers: ["Alt"], key: "c" }, { modifiers: ["Alt"], key: "с" }),
       callback: () => this.engine.stop()
     });
 
     this.addCommand({
       id: "set-marker",
       name: "Set marker at current position",
-      hotkeys: [
-        { modifiers: ["Alt"], key: "z" },
-        { modifiers: ["Alt"], key: "я" }
-      ],
+      hotkeys: this.keys({ modifiers: ["Alt"], key: "z" }, { modifiers: ["Alt"], key: "я" }),
       callback: () => this.engine.setMarkerHere()
     });
 
@@ -119,20 +125,14 @@ export default class SongwriterPlugin extends Plugin {
     this.addCommand({
       id: "seek-back",
       name: "Seek back",
-      hotkeys: [
-        { modifiers: ["Alt"], key: "," },
-        { modifiers: ["Alt"], key: "б" }
-      ],
+      hotkeys: this.keys({ modifiers: ["Alt"], key: "," }, { modifiers: ["Alt"], key: "б" }),
       callback: () => this.engine.seekBy(-this.settings.skipSeconds)
     });
 
     this.addCommand({
       id: "seek-forward",
       name: "Seek forward",
-      hotkeys: [
-        { modifiers: ["Alt"], key: "." },
-        { modifiers: ["Alt"], key: "ю" }
-      ],
+      hotkeys: this.keys({ modifiers: ["Alt"], key: "." }, { modifiers: ["Alt"], key: "ю" }),
       callback: () => this.engine.seekBy(this.settings.skipSeconds)
     });
 
@@ -143,14 +143,14 @@ export default class SongwriterPlugin extends Plugin {
     this.addCommand({
       id: "transpose-up",
       name: "Transpose up a semitone",
-      hotkeys: [{ modifiers: ["Alt"], key: "PageUp" }],
+      hotkeys: this.keys({ modifiers: ["Alt"], key: "PageUp" }),
       callback: () => void this.engine.setSemitones(this.engine.semitones + 1)
     });
 
     this.addCommand({
       id: "transpose-down",
       name: "Transpose down a semitone",
-      hotkeys: [{ modifiers: ["Alt"], key: "PageDown" }],
+      hotkeys: this.keys({ modifiers: ["Alt"], key: "PageDown" }),
       callback: () => void this.engine.setSemitones(this.engine.semitones - 1)
     });
 
@@ -158,21 +158,21 @@ export default class SongwriterPlugin extends Plugin {
     this.addCommand({
       id: "rate-up",
       name: "Play faster",
-      hotkeys: [{ modifiers: ["Alt"], key: "=" }],
+      hotkeys: this.keys({ modifiers: ["Alt"], key: "=" }),
       callback: () => this.engine.stepRate(1)
     });
 
     this.addCommand({
       id: "rate-down",
       name: "Play slower",
-      hotkeys: [{ modifiers: ["Alt"], key: "-" }],
+      hotkeys: this.keys({ modifiers: ["Alt"], key: "-" }),
       callback: () => this.engine.stepRate(-1)
     });
 
     this.addCommand({
       id: "rate-reset",
       name: "Play as recorded (reset speed and key)",
-      hotkeys: [{ modifiers: ["Alt"], key: "0" }],
+      hotkeys: this.keys({ modifiers: ["Alt"], key: "0" }),
       callback: () => {
         this.engine.setRate(1);
         // guarded: on mobile setSemitones only reports that it is unavailable
@@ -202,10 +202,7 @@ export default class SongwriterPlugin extends Plugin {
     this.addCommand({
       id: "next-track",
       name: "Next track in the playlist",
-      hotkeys: [
-        { modifiers: ["Alt"], key: "n" },
-        { modifiers: ["Alt"], key: "т" }
-      ],
+      hotkeys: this.keys({ modifiers: ["Alt"], key: "n" }, { modifiers: ["Alt"], key: "т" }),
       callback: () => {
         void this.engine.step(1);
       }
@@ -214,10 +211,7 @@ export default class SongwriterPlugin extends Plugin {
     this.addCommand({
       id: "prev-track",
       name: "Previous track in the playlist",
-      hotkeys: [
-        { modifiers: ["Alt"], key: "b" },
-        { modifiers: ["Alt"], key: "и" }
-      ],
+      hotkeys: this.keys({ modifiers: ["Alt"], key: "b" }, { modifiers: ["Alt"], key: "и" }),
       callback: () => {
         void this.engine.step(-1);
       }
@@ -232,10 +226,7 @@ export default class SongwriterPlugin extends Plugin {
     this.addCommand({
       id: "open-track-note",
       name: "Open track's note",
-      hotkeys: [
-        { modifiers: ["Alt"], key: "d" },
-        { modifiers: ["Alt"], key: "в" }
-      ],
+      hotkeys: this.keys({ modifiers: ["Alt"], key: "d" }, { modifiers: ["Alt"], key: "в" }),
       callback: () => this.openTrackNote()
     });
 
@@ -635,7 +626,8 @@ export default class SongwriterPlugin extends Plugin {
   // ---- persistence ----
 
   async loadSettings() {
-    const loaded = ((await this.loadData()) ?? {}) as LegacySettings;
+    const raw = await this.loadData();
+    const loaded = (raw ?? {}) as LegacySettings;
     // migrate from v0.1.0 (startPoint + named markers); `rate` (playback
     // speed, removed for now) and old per-track BPM/key fields are dropped
     // simply by not copying them over.
@@ -644,6 +636,15 @@ export default class SongwriterPlugin extends Plugin {
     this.settings = { ...DEFAULT_SETTINGS, ...rest, tracks: {} };
     if (startFromPointOnLoad !== undefined && rest.startFromMarkerOnLoad === undefined) {
       this.settings.startFromMarkerOnLoad = startFromPointOnLoad;
+    }
+    // Up to 1.5.1 the hotkeys were baked into the commands, so everyone had
+    // them whether they wanted them or not. They are opt-in from now on — but a
+    // vault that has been using them must not lose them on an update, so an
+    // existing installation is switched on and only a fresh one starts bare.
+    // The plugin writes its settings on unload, so "has a data file" is a
+    // reliable stand-in for "was already here".
+    if (rest.defaultHotkeys === undefined) {
+      this.settings.defaultHotkeys = raw != null;
     }
     for (const [path, raw] of Object.entries(loadedTracks ?? {})) {
       const firstMarker = Array.isArray(raw.markers) ? raw.markers[0]?.time : undefined;
@@ -792,6 +793,19 @@ class SongwriterSettingTab extends PluginSettingTab {
         describeWindow();
         await this.plugin.saveSettings();
       }));
+
+    new Setting(containerEl).setName(t("headingHotkeys")).setHeading();
+
+    new Setting(containerEl)
+      .setName(t("setHotkeysName"))
+      .setDesc(t("setHotkeysDesc"))
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.defaultHotkeys)
+        .onChange(async (value) => {
+          this.plugin.settings.defaultHotkeys = value;
+          await this.plugin.saveSettings();
+          new Notice(t("hotkeysReloadHint"), 6000);
+        }));
 
     new Setting(containerEl).setName(t("headingFine")).setHeading();
 

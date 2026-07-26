@@ -127,5 +127,17 @@ export default async function run() {
     s.check("no file at all yields defaults", () => missing.loaded.pickupMode === "hybrid");
   }
 
+  // ---- hotkeys became opt-in, without pulling them from under anyone ----
+  {
+    const fresh = await roundTrip(null);
+    s.check("a fresh install starts without hotkeys", () => fresh.loaded.defaultHotkeys === false);
+
+    const upgraded = await roundTrip({ tracks: {} });
+    s.check("a vault that was already here keeps them", () => upgraded.loaded.defaultHotkeys === true);
+
+    const declined = await roundTrip({ defaultHotkeys: false, tracks: {} });
+    s.check("a choice already made is not overruled", () => declined.loaded.defaultHotkeys === false);
+  }
+
   return s.report();
 }

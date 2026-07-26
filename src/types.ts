@@ -60,6 +60,8 @@ export interface SongwriterSettings {
   fabMode: FabMode;
   /** hand the track to the OS: media keys, lock screen, "now playing" card */
   mediaKeys: boolean;
+  /** register the built-in single-Alt hotkeys; off leaves every command bare */
+  defaultHotkeys: boolean;
   folderQueue: boolean;
   autoAdvance: boolean;
   playlistCollapsed: boolean;
@@ -82,6 +84,9 @@ export const DEFAULT_SETTINGS: SongwriterSettings = {
   mobileFab: true,
   fabMode: "marker",
   mediaKeys: true,
+  // off for a fresh install; loadSettings turns it on for a vault upgrading
+  // from a version where these keys were baked into the commands
+  defaultHotkeys: false,
   folderQueue: true,
   autoAdvance: false,
   playlistCollapsed: false,

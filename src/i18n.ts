@@ -125,6 +125,11 @@ const en = {
   setTempoWindowName: "Preferred tempo range",
   setTempoWindowDesc: (low: number, high: number) =>
     `Whether a beat is heard at ${low} or at ${low * 2} is a matter of feel, so the measured tempo is halved or doubled into ${low}–${high} — exactly one octave, so every tempo lands on a single value. ×2 and ÷2 on the badge still override it for a given track.`,
+  headingHotkeys: "Hotkeys",
+  setHotkeysName: "Use the built-in hotkeys",
+  setHotkeysDesc:
+    "Register the plugin's own single-Alt bindings — Alt+P play/pause, Alt+X play from marker, Alt+Z set marker, Alt+B / Alt+N previous and next track, and so on, each also bound for the Russian layout. Off: the commands arrive without keys and can be bound to anything from Obsidian's hotkey settings, where your own assignments win either way. Every command stays available from the command palette.",
+  hotkeysReloadHint: "Songwriter: the hotkeys change once the plugin is reloaded (or Obsidian restarts).",
   headingFine: "Fine tuning",
   setMediaKeysName: "Media keys",
   setMediaKeysDesc:
@@ -255,6 +260,11 @@ const ru: typeof en = {
   setTempoWindowName: "Предпочтительный диапазон темпа",
   setTempoWindowDesc: (low: number, high: number) =>
     `Слышится бит на ${low} или на ${low * 2} — вопрос ощущения, поэтому измеренный темп сам делится или умножается вдвое и попадает в ${low}–${high}. Это ровно одна октава, так что любой темп даёт единственное значение. Кнопки ×2 и ÷2 в плашке всё равно перебивают это для отдельного трека.`,
+  headingHotkeys: "Горячие клавиши",
+  setHotkeysName: "Использовать встроенные хоткеи",
+  setHotkeysDesc:
+    "Регистрировать собственные сочетания плагина на одиночном Alt — Alt+P плей/пауза, Alt+X играть с маркера, Alt+Z поставить маркер, Alt+B и Alt+N предыдущий и следующий трек и так далее, каждое продублировано для русской раскладки. Выключено — команды приходят без клавиш, и повесить их можно на что угодно в настройках горячих клавиш Obsidian; ваши собственные назначения в любом случае важнее умолчаний. Все команды при этом остаются доступны из палитры.",
+  hotkeysReloadHint: "Songwriter: горячие клавиши изменятся после перезагрузки плагина (или перезапуска Obsidian).",
   headingFine: "Тонкая настройка",
   setMediaKeysName: "Медиа-клавиши",
   setMediaKeysDesc:
