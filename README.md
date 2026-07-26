@@ -106,7 +106,14 @@ Russian), works on desktop and mobile ("open externally" needs desktop).
 npm install
 npm run build   # tsc typecheck + esbuild → main.js
 npm run dev     # watch mode
+npm test        # bundles the real source and drives it against stubs
 ```
+
+The tests need no framework: they bundle `src/` exactly as it ships, run it with a
+stub `obsidian` module, and drive the result — so what is checked is the artifact
+users install, not a restatement of the logic. The settings suite guards the round
+trip through `data.json`, where a field added to the type but forgotten in the
+migration is written faithfully and then dropped on the next start.
 
 ## License
 

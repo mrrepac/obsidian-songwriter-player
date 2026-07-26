@@ -25,6 +25,11 @@ jobs:
           npm ci
           npm run build
 
+      # a red test stops the release: better a tag with no release behind it
+      # than a release that loses someone's settings
+      - name: Run tests
+        run: npm test
+
       # Provenance is a nice-to-have that depends on Sigstore's transparency
       # log: when that service is down (it answered 404 for the whole 1.4.0
       # release window) the attestation must not hold the release hostage.
