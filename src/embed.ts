@@ -132,7 +132,7 @@ export class EmbedPlayers {
   private decorate(audio: HTMLAudioElement, file: TFile) {
     const button = createEl("button", { cls: "sw-ext-btn clickable-icon" });
     setIcon(button, "external-link");
-    button.title = EXT_BTN_TITLE;
+    button.setAttribute("aria-label", EXT_BTN_TITLE);
     button.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -221,7 +221,7 @@ class EmbedPlayer {
 
     const main = root.createDiv({ cls: "sw-embed-main" });
     this.playBtn = main.createEl("button", { cls: "sw-embed-play" });
-    this.playBtn.title = t("playPauseTitle");
+    this.playBtn.setAttribute("aria-label", t("playPauseTitle"));
     this.playBtn.addEventListener("click", (e) => {
       e.preventDefault();
       if (engine.file?.path === this.file.path) void engine.playPause();
@@ -241,7 +241,7 @@ class EmbedPlayer {
 
     const ext = main.createEl("button", { cls: "sw-embed-ext clickable-icon" });
     setIcon(ext, "external-link");
-    ext.title = EXT_BTN_TITLE;
+    ext.setAttribute("aria-label", EXT_BTN_TITLE);
     ext.addEventListener("click", (e) => {
       e.preventDefault();
       openExternally(plugin.app, this.file);

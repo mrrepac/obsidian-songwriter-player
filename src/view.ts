@@ -108,11 +108,13 @@ export class SongwriterView extends ItemView {
     this.buildTransport(controls);
 
     this.rateEl = controls.createSpan({ cls: "sw-rate" });
+    this.rateEl.setAttribute("role", "button");
     this.rateEl.addEventListener("click", () => this.onRateClick());
     this.updateRate();
 
     if (Platform.isDesktop) {
       this.pitchEl = controls.createSpan({ cls: "sw-pitch" });
+      this.pitchEl.setAttribute("role", "button");
       this.pitchEl.addEventListener("click", () => this.onPitchClick());
       this.updatePitch();
     }
@@ -125,7 +127,7 @@ export class SongwriterView extends ItemView {
     vol.max = "1";
     vol.step = "0.01";
     vol.value = String(this.plugin.settings.volume);
-    vol.title = t("volume");
+    vol.setAttribute("aria-label", t("volume"));
     vol.addEventListener("input", () => this.engine.setVolume(parseFloat(vol.value)));
 
     // the playlist lives outside the player block, so it stays reachable
@@ -158,7 +160,7 @@ export class SongwriterView extends ItemView {
 
   applySettings() {
     this.contentEl.style.setProperty("--sw-wave-height", `${this.plugin.settings.waveHeight}px`);
-    this.refreshSeekTitles();
+    this.refreshSeekLabels();
   }
 
   async onClose() {
@@ -204,7 +206,7 @@ export class SongwriterView extends ItemView {
       void this.engine.step(1);
     });
 
-    this.refreshSeekTitles();
+    this.refreshSeekLabels();
   }
 
   /** ⏮ ⏭ only make sense with a playlist, and only where there is a neighbor. */
@@ -217,19 +219,25 @@ export class SongwriterView extends ItemView {
     this.nextBtn.disabled = !this.engine.hasStep(1);
   }
 
-  private transportBtn(parent: HTMLElement, icon: string, title: string): HTMLButtonElement {
+  /**
+   * aria-label rather than title: these buttons carry an icon and no text, so
+   * this is the only name a screen reader has to announce. Obsidian renders
+   * its own tooltip from aria-label as well, so setting title on top would
+   * show two tooltips at once.
+   */
+  private transportBtn(parent: HTMLElement, icon: string, label: string): HTMLButtonElement {
     const btn = parent.createEl("button", { cls: "sw-tbtn" });
     setIcon(btn, icon);
-    if (title) btn.title = title;
+    if (label) btn.setAttribute("aria-label", label);
     return btn;
   }
 
-  refreshSeekTitles() {
+  refreshSeekLabels() {
     const s = this.plugin.settings.skipSeconds;
     const back = this.contentRoot.querySelector<HTMLElement>(".sw-seek-back");
     const fwd = this.contentRoot.querySelector<HTMLElement>(".sw-seek-fwd");
-    if (back) back.title = t("seekBackTitle")(s);
-    if (fwd) fwd.title = t("seekFwdTitle")(s);
+    back?.setAttribute("aria-label", t("seekBackTitle")(s));
+    fwd?.setAttribute("aria-label", t("seekFwdTitle")(s));
   }
 
   // ---- renders ----
@@ -264,6 +272,10 @@ export class SongwriterView extends ItemView {
     });
     if (file) {
       name.addClass("sw-track-name-link");
+      // role, not aria-label: the track's name is already the visible text, and
+      // an aria-label would replace it with the explanation. title stays,
+      // because it is read as a description rather than as the name.
+      name.setAttribute("role", "button");
       name.title = t("openTrackNoteTitle");
       name.addEventListener("click", () => {
         void this.plugin.openTrackNote();
@@ -273,6 +285,7 @@ export class SongwriterView extends ItemView {
 
     if (file) {
       this.musicalEl = this.trackRow.createSpan({ cls: "sw-musical" });
+      this.musicalEl.setAttribute("role", "button");
       this.musicalEl.addEventListener("click", () => this.onMusicalClick(file));
       this.updateMusical();
 
@@ -286,7 +299,7 @@ export class SongwriterView extends ItemView {
 
       const extBtn = this.trackRow.createEl("button", { cls: "clickable-icon sw-icon-btn sw-ext-open" });
       setIcon(extBtn, "external-link");
-      extBtn.title = EXT_BTN_TITLE;
+      extBtn.setAttribute("aria-label", EXT_BTN_TITLE);
       extBtn.addEventListener("click", () => openExternally(this.app, file));
       extBtn.addEventListener("contextmenu", (e) => {
         e.preventDefault();
@@ -295,7 +308,7 @@ export class SongwriterView extends ItemView {
 
       const ejectBtn = this.trackRow.createEl("button", { cls: "clickable-icon sw-icon-btn sw-eject" });
       setIcon(ejectBtn, "arrow-up-from-line");
-      ejectBtn.title = t("ejectTitle");
+      ejectBtn.setAttribute("aria-label", t("ejectTitle"));
       ejectBtn.addEventListener("click", () => this.engine.unload());
     }
   }
@@ -497,7 +510,7 @@ export class SongwriterView extends ItemView {
     });
     const closeBtn = this.pendingRow.createEl("button", { cls: "clickable-icon sw-icon-btn" });
     setIcon(closeBtn, "x");
-    closeBtn.title = t("hideBtn");
+    closeBtn.setAttribute("aria-label", t("hideBtn"));
     closeBtn.addEventListener("click", () => this.engine.setPendingSwitch(null));
   }
 
@@ -507,6 +520,7 @@ export class SongwriterView extends ItemView {
     this.playlistEl = parent.createDiv({ cls: "sw-playlist" });
 
     const head = this.playlistEl.createDiv({ cls: "sw-playlist-head" });
+    head.setAttribute("role", "button");
     head.title = t("playlistToggleTitle");
     this.playlistIcon = head.createSpan({ cls: "sw-playlist-icon" });
     this.playlistTitle = head.createSpan({ cls: "sw-playlist-title" });
@@ -524,6 +538,9 @@ export class SongwriterView extends ItemView {
   private applyPlaylistCollapsed() {
     const collapsed = this.plugin.settings.playlistCollapsed;
     this.playlistList.toggle(!collapsed);
+    // the chevron says this visually; aria-expanded says it to everyone else
+    this.playlistEl.querySelector(".sw-playlist-head")
+      ?.setAttribute("aria-expanded", String(!collapsed));
     setIcon(this.playlistChevron, collapsed ? "chevron-right" : "chevron-down");
   }
 
@@ -572,6 +589,7 @@ export class SongwriterView extends ItemView {
     this.currentRowPath = null; // fresh rows: nothing is highlighted yet
     queue.forEach((f, index) => {
       const row = this.playlistList.createDiv({ cls: "sw-pl-row" });
+      row.setAttribute("role", "button");
       const num = row.createSpan({ cls: "sw-pl-num", text: String(index + 1) });
       row.createSpan({ cls: "sw-pl-name", text: f.basename, title: f.path });
       const flag = row.createSpan({ cls: "sw-pl-flag" });
@@ -655,7 +673,11 @@ export class SongwriterView extends ItemView {
     els.flag.empty();
     if (hasMarker) {
       setIcon(els.flag, "flag");
-      els.flag.title = t("rowMarkerTitle");
+      // an icon with no text has no name at all without this; and it has to
+      // come off again when the marker does, or the row goes on claiming one
+      els.flag.setAttribute("aria-label", t("rowMarkerTitle"));
+    } else {
+      els.flag.removeAttribute("aria-label");
     }
     els.plays.setText(data?.plays ? `▶ ${data.plays}` : "");
     const key = formatKey(data?.key, data?.scale);
