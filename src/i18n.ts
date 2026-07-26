@@ -126,6 +126,9 @@ const en = {
   setTempoWindowDesc: (low: number, high: number) =>
     `Whether a beat is heard at ${low} or at ${low * 2} is a matter of feel, so the measured tempo is halved or doubled into ${low}–${high} — exactly one octave, so every tempo lands on a single value. ×2 and ÷2 on the badge still override it for a given track.`,
   headingFine: "Fine tuning",
+  setMediaKeysName: "Media keys",
+  setMediaKeysDesc:
+    "Hand the loaded track to the system, so the play/pause and next/previous keys on the keyboard reach this player and it appears in the system's now-playing card. Turn it off if another player should keep the media keys.",
   setPlayCountName: "Play-count threshold",
   setPlayCountDesc: "How many seconds must actually sound for a run to land in the play counter.",
   setDoubleStopName: "Double-stop window",
@@ -253,6 +256,9 @@ const ru: typeof en = {
   setTempoWindowDesc: (low: number, high: number) =>
     `Слышится бит на ${low} или на ${low * 2} — вопрос ощущения, поэтому измеренный темп сам делится или умножается вдвое и попадает в ${low}–${high}. Это ровно одна октава, так что любой темп даёт единственное значение. Кнопки ×2 и ÷2 в плашке всё равно перебивают это для отдельного трека.`,
   headingFine: "Тонкая настройка",
+  setMediaKeysName: "Медиа-клавиши",
+  setMediaKeysDesc:
+    "Отдавать загруженный трек системе: клавиши плей/пауза и вперёд/назад на клавиатуре доходят до этого плеера, а сам трек виден в системной карточке «сейчас играет». Выключите, если медиа-клавиши должны остаться за другим плеером.",
   setPlayCountName: "Порог зачёта прогона",
   setPlayCountDesc: "Сколько секунд должно реально прозвучать, чтобы прогон попал в счётчик проигрываний.",
   setDoubleStopName: "Окно двойного стопа",

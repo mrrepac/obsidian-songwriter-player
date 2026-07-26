@@ -58,6 +58,8 @@ export interface SongwriterSettings {
   embedButtons: boolean;
   mobileFab: boolean;
   fabMode: FabMode;
+  /** hand the track to the OS: media keys, lock screen, "now playing" card */
+  mediaKeys: boolean;
   folderQueue: boolean;
   autoAdvance: boolean;
   playlistCollapsed: boolean;
@@ -79,6 +81,7 @@ export const DEFAULT_SETTINGS: SongwriterSettings = {
   embedButtons: true,
   mobileFab: true,
   fabMode: "marker",
+  mediaKeys: true,
   folderQueue: true,
   autoAdvance: false,
   playlistCollapsed: false,

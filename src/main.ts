@@ -6,6 +6,7 @@ import { t } from "./i18n";
 import { openExternally, revealInExplorer } from "./external";
 import { EmbedPlayers } from "./embed";
 import { PlayerEngine } from "./engine";
+import { MediaSessionBridge } from "./mediasession";
 import { MobileMarkerButton } from "./mobilefab";
 import { SongwriterView, VIEW_TYPE_SONGWRITER } from "./view";
 
@@ -40,6 +41,7 @@ export default class SongwriterPlugin extends Plugin {
   engine: PlayerEngine;
   embeds: EmbedPlayers;
   mobileFab: MobileMarkerButton;
+  mediaSession: MediaSessionBridge;
   private saveTimer: number | null = null;
 
   async onload() {
@@ -49,6 +51,8 @@ export default class SongwriterPlugin extends Plugin {
     this.embeds.start();
     this.mobileFab = new MobileMarkerButton(this);
     this.mobileFab.start();
+    this.mediaSession = new MediaSessionBridge(this);
+    this.mediaSession.start();
 
     this.registerView(VIEW_TYPE_SONGWRITER, (leaf) => new SongwriterView(leaf, this));
     this.addRibbonIcon("music", t("ribbonOpenPlayer"), () => this.activateView());
@@ -334,6 +338,7 @@ export default class SongwriterPlugin extends Plugin {
     void this.saveSettings();
     this.embeds.destroy();
     this.mobileFab.destroy();
+    this.mediaSession.destroy();
     this.engine.destroy();
   }
 
@@ -789,6 +794,21 @@ class SongwriterSettingTab extends PluginSettingTab {
       }));
 
     new Setting(containerEl).setName(t("headingFine")).setHeading();
+
+    // desktop only: on mobile the WebView never reaches the system media
+    // controls (see mediasession.ts), so the toggle would promise nothing
+    if (Platform.isDesktop) {
+      new Setting(containerEl)
+        .setName(t("setMediaKeysName"))
+        .setDesc(t("setMediaKeysDesc"))
+        .addToggle(toggle => toggle
+          .setValue(this.plugin.settings.mediaKeys)
+          .onChange(async (value) => {
+            this.plugin.settings.mediaKeys = value;
+            this.plugin.mediaSession.applyEnabled();
+            await this.plugin.saveSettings();
+          }));
+    }
 
     new Setting(containerEl)
       .setName(t("setPlayCountName"))
