@@ -119,6 +119,23 @@ export default async function run() {
     s.check("a hand correction is never re-folded", () => loaded.tracks["by-hand.mp3"].bpm === 160);
   }
 
+  // ---- settings a withdrawn feature left behind ----
+  // The beat grid was tried and taken out; its keys stay in data.json until a
+  // load drops them, and a stray key that survives becomes the kind of puzzle
+  // that costs an hour to explain later.
+  {
+    const { saved } = await roundTrip({
+      beatGrid: true,
+      snapToBeats: true,
+      snapBars: 8,
+      tracks: { "measured.mp3": track({ bpm: 130, plays: 1 }) }
+    });
+    s.check("the withdrawn grid settings are not written back",
+      () => saved.beatGrid === undefined && saved.snapToBeats === undefined && saved.snapBars === undefined);
+    s.check("nor is a grid ever stored on a track",
+      () => saved.tracks["measured.mp3"].beatOffset === undefined);
+  }
+
   // ---- defaults ----
   {
     const { loaded } = await roundTrip({});

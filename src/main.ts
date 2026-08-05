@@ -20,6 +20,48 @@ interface LegacySettings extends Partial<Omit<SongwriterSettings, "tracks">> {
   tracks?: Record<string, LegacyTrackData>;
   startFromPointOnLoad?: boolean;
   rate?: number;
+  /** the beat-grid experiment — drawn bar lines and snapping, both withdrawn */
+  beatGrid?: boolean;
+  snapToBeats?: boolean;
+  snapBars?: number;
+}
+
+/**
+ * The built-in bindings, gathered here rather than left at each command, so the
+ * setting that offers them can also apply them to a running app.
+ *
+ * Every letter has its Russian twin: the physical key is what the player is
+ * reached by, and switching layout mid-sentence to pause the music is not a
+ * thing anyone should have to do.
+ */
+export const DEFAULT_HOTKEYS: Record<string, Hotkey[]> = {
+  "play-pause": [{ modifiers: ["Alt"], key: "p" }, { modifiers: ["Alt"], key: "з" }],
+  "play-from-marker": [{ modifiers: ["Alt"], key: "x" }, { modifiers: ["Alt"], key: "ч" }],
+  "stop": [{ modifiers: ["Alt"], key: "c" }, { modifiers: ["Alt"], key: "с" }],
+  "set-marker": [{ modifiers: ["Alt"], key: "z" }, { modifiers: ["Alt"], key: "я" }],
+  "seek-back": [{ modifiers: ["Alt"], key: "," }, { modifiers: ["Alt"], key: "б" }],
+  "seek-forward": [{ modifiers: ["Alt"], key: "." }, { modifiers: ["Alt"], key: "ю" }],
+  "next-track": [{ modifiers: ["Alt"], key: "n" }, { modifiers: ["Alt"], key: "т" }],
+  "prev-track": [{ modifiers: ["Alt"], key: "b" }, { modifiers: ["Alt"], key: "и" }],
+  "open-track-note": [{ modifiers: ["Alt"], key: "d" }, { modifiers: ["Alt"], key: "в" }],
+  // the keypad cluster: × ÷ for the key, + − for the tempo, 0 to undo both
+  "transpose-up": [{ modifiers: ["Alt"], key: "PageUp" }, { modifiers: ["Alt"], key: "*" }],
+  "transpose-down": [{ modifiers: ["Alt"], key: "PageDown" }, { modifiers: ["Alt"], key: "/" }],
+  "rate-up": [{ modifiers: ["Alt"], key: "=" }, { modifiers: ["Alt"], key: "+" }],
+  "rate-down": [{ modifiers: ["Alt"], key: "-" }],
+  "rate-reset": [{ modifiers: ["Alt"], key: "0" }]
+};
+
+/**
+ * Obsidian's own table of default bindings. Not part of the plugin API, but it
+ * is what makes the setting take effect at once: writing here flips the table's
+ * `baked` flag and the app rebuilds it on the next keystroke. Without it a
+ * command keeps whatever it was registered with at load, and trying a key out
+ * would cost a restart every time.
+ */
+interface HotkeyManager {
+  addDefaultHotkeys(id: string, hotkeys: Hotkey[]): void;
+  removeDefaultHotkeys(id: string): void;
 }
 
 /** Stored speed, clamped to what the engine can set; "as recorded" stays undefined. */
@@ -55,11 +97,30 @@ export default class SongwriterPlugin extends Plugin {
    * Obsidian's own hotkey settings always beats a default either way, so this
    * only decides what a command starts out with.
    *
-   * Commands are registered once, at load, so a change takes effect when the
-   * plugin is reloaded.
+   * Turning the setting on or off applies immediately — see
+   * applyDefaultHotkeys, which is what spares a reload after every change.
    */
-  private keys(...hotkeys: Hotkey[]): Hotkey[] {
-    return this.settings.defaultHotkeys ? hotkeys : [];
+  private keys(command: string): Hotkey[] {
+    return this.settings.defaultHotkeys ? DEFAULT_HOTKEYS[command] ?? [] : [];
+  }
+
+  /**
+   * Hand the built-in bindings to the running app, or take them back.
+   *
+   * Returns false if Obsidian has no hotkey table to write to — then the change
+   * is still saved and simply waits for the next reload, which is what the
+   * caller says out loud rather than leaving the keys silently dead.
+   */
+  applyDefaultHotkeys(): boolean {
+    const manager = (this.app as App & { hotkeyManager?: HotkeyManager }).hotkeyManager;
+    if (typeof manager?.addDefaultHotkeys !== "function") return false;
+    if (typeof manager.removeDefaultHotkeys !== "function") return false;
+    for (const command of Object.keys(DEFAULT_HOTKEYS)) {
+      const id = `${this.manifest.id}:${command}`;
+      if (this.settings.defaultHotkeys) manager.addDefaultHotkeys(id, DEFAULT_HOTKEYS[command]);
+      else manager.removeDefaultHotkeys(id);
+    }
+    return true;
   }
 
   async onload() {
@@ -85,28 +146,28 @@ export default class SongwriterPlugin extends Plugin {
     this.addCommand({
       id: "play-pause",
       name: "Play/Pause",
-      hotkeys: this.keys({ modifiers: ["Alt"], key: "p" }, { modifiers: ["Alt"], key: "з" }),
+      hotkeys: this.keys("play-pause"),
       callback: () => this.engine.playPause()
     });
 
     this.addCommand({
       id: "play-from-marker",
       name: "Play from marker (or from start)",
-      hotkeys: this.keys({ modifiers: ["Alt"], key: "x" }, { modifiers: ["Alt"], key: "ч" }),
+      hotkeys: this.keys("play-from-marker"),
       callback: () => this.engine.playFromMarker()
     });
 
     this.addCommand({
       id: "stop",
       name: "Stop",
-      hotkeys: this.keys({ modifiers: ["Alt"], key: "c" }, { modifiers: ["Alt"], key: "с" }),
+      hotkeys: this.keys("stop"),
       callback: () => this.engine.stop()
     });
 
     this.addCommand({
       id: "set-marker",
       name: "Set marker at current position",
-      hotkeys: this.keys({ modifiers: ["Alt"], key: "z" }, { modifiers: ["Alt"], key: "я" }),
+      hotkeys: this.keys("set-marker"),
       callback: () => this.engine.setMarkerHere()
     });
 
@@ -125,32 +186,41 @@ export default class SongwriterPlugin extends Plugin {
     this.addCommand({
       id: "seek-back",
       name: "Seek back",
-      hotkeys: this.keys({ modifiers: ["Alt"], key: "," }, { modifiers: ["Alt"], key: "б" }),
+      hotkeys: this.keys("seek-back"),
       callback: () => this.engine.seekBy(-this.settings.skipSeconds)
     });
 
     this.addCommand({
       id: "seek-forward",
       name: "Seek forward",
-      hotkeys: this.keys({ modifiers: ["Alt"], key: "." }, { modifiers: ["Alt"], key: "ю" }),
+      hotkeys: this.keys("seek-forward"),
       callback: () => this.engine.seekBy(this.settings.skipSeconds)
     });
 
-    // NOT Alt+↑/↓: Obsidian's editor binds those to "move line up/down" in its
-    // CodeMirror keymap, which fires first — so they would quietly do nothing
-    // while the cursor is in a note. Alt+PageUp/PageDown are free (checked
-    // against the app's own keymap), as are Alt+Home/End for a reset.
+    // The four of these sit together on the numeric keypad, where nothing else
+    // in Obsidian is listening: ×  and ÷ change the key, + and − the tempo, so
+    // the whole player falls under one hand. PageUp/PageDown and =/− stay as
+    // they were for keyboards that have no keypad.
+    //
+    // Obsidian names a key by its keyCode, and the keypad has its own numbers:
+    // 106 is "*", 111 is "/", 107 is "+" — where the main row's = is "=", which
+    // is why a hotkey bound to "=" never hears the keypad. The minus is the one
+    // that needs nothing extra: 109 and 189 both answer to "-".
+    //
+    // NOT the arrows: Obsidian keeps Alt+↑/↓ for "move line up/down", and
+    // CodeMirror takes Alt+←/→ for word-wise cursor movement before a plugin
+    // ever sees them.
     this.addCommand({
       id: "transpose-up",
       name: "Transpose up a semitone",
-      hotkeys: this.keys({ modifiers: ["Alt"], key: "PageUp" }),
+      hotkeys: this.keys("transpose-up"),
       callback: () => void this.engine.setSemitones(this.engine.semitones + 1)
     });
 
     this.addCommand({
       id: "transpose-down",
       name: "Transpose down a semitone",
-      hotkeys: this.keys({ modifiers: ["Alt"], key: "PageDown" }),
+      hotkeys: this.keys("transpose-down"),
       callback: () => void this.engine.setSemitones(this.engine.semitones - 1)
     });
 
@@ -158,21 +228,21 @@ export default class SongwriterPlugin extends Plugin {
     this.addCommand({
       id: "rate-up",
       name: "Play faster",
-      hotkeys: this.keys({ modifiers: ["Alt"], key: "=" }),
+      hotkeys: this.keys("rate-up"),
       callback: () => this.engine.stepRate(1)
     });
 
     this.addCommand({
       id: "rate-down",
       name: "Play slower",
-      hotkeys: this.keys({ modifiers: ["Alt"], key: "-" }),
+      hotkeys: this.keys("rate-down"),
       callback: () => this.engine.stepRate(-1)
     });
 
     this.addCommand({
       id: "rate-reset",
       name: "Play as recorded (reset speed and key)",
-      hotkeys: this.keys({ modifiers: ["Alt"], key: "0" }),
+      hotkeys: this.keys("rate-reset"),
       callback: () => {
         this.engine.setRate(1);
         // guarded: on mobile setSemitones only reports that it is unavailable
@@ -202,7 +272,7 @@ export default class SongwriterPlugin extends Plugin {
     this.addCommand({
       id: "next-track",
       name: "Next track in the playlist",
-      hotkeys: this.keys({ modifiers: ["Alt"], key: "n" }, { modifiers: ["Alt"], key: "т" }),
+      hotkeys: this.keys("next-track"),
       callback: () => {
         void this.engine.step(1);
       }
@@ -211,7 +281,7 @@ export default class SongwriterPlugin extends Plugin {
     this.addCommand({
       id: "prev-track",
       name: "Previous track in the playlist",
-      hotkeys: this.keys({ modifiers: ["Alt"], key: "b" }, { modifiers: ["Alt"], key: "и" }),
+      hotkeys: this.keys("prev-track"),
       callback: () => {
         void this.engine.step(-1);
       }
@@ -226,7 +296,7 @@ export default class SongwriterPlugin extends Plugin {
     this.addCommand({
       id: "open-track-note",
       name: "Open track's note",
-      hotkeys: this.keys({ modifiers: ["Alt"], key: "d" }, { modifiers: ["Alt"], key: "в" }),
+      hotkeys: this.keys("open-track-note"),
       callback: () => this.openTrackNote()
     });
 
@@ -629,10 +699,14 @@ export default class SongwriterPlugin extends Plugin {
     const raw = await this.loadData();
     const loaded = (raw ?? {}) as LegacySettings;
     // migrate from v0.1.0 (startPoint + named markers); `rate` (playback
-    // speed, removed for now) and old per-track BPM/key fields are dropped
-    // simply by not copying them over.
-    const { tracks: loadedTracks, startFromPointOnLoad, rate, ...rest } = loaded;
-    void rate;
+    // speed, removed for now), the withdrawn beat-grid settings and old
+    // per-track BPM/key fields are dropped simply by not copying them over.
+    const {
+      tracks: loadedTracks, startFromPointOnLoad,
+      rate, beatGrid, snapToBeats, snapBars,
+      ...rest
+    } = loaded;
+    void [rate, beatGrid, snapToBeats, snapBars];
     this.settings = { ...DEFAULT_SETTINGS, ...rest, tracks: {} };
     if (startFromPointOnLoad !== undefined && rest.startFromMarkerOnLoad === undefined) {
       this.settings.startFromMarkerOnLoad = startFromPointOnLoad;
@@ -804,7 +878,12 @@ class SongwriterSettingTab extends PluginSettingTab {
         .onChange(async (value) => {
           this.plugin.settings.defaultHotkeys = value;
           await this.plugin.saveSettings();
-          new Notice(t("hotkeysReloadHint"), 6000);
+          // live, so trying a key out costs a keystroke instead of a restart
+          if (this.plugin.applyDefaultHotkeys()) {
+            new Notice(value ? t("hotkeysOn") : t("hotkeysOff"), 4000);
+          } else {
+            new Notice(t("hotkeysReloadHint"), 6000);
+          }
         }));
 
     new Setting(containerEl).setName(t("headingFine")).setHeading();

@@ -128,7 +128,9 @@ const en = {
   headingHotkeys: "Hotkeys",
   setHotkeysName: "Use the built-in hotkeys",
   setHotkeysDesc:
-    "Register the plugin's own single-Alt bindings — Alt+P play/pause, Alt+X play from marker, Alt+Z set marker, Alt+B / Alt+N previous and next track, and so on, each also bound for the Russian layout. Off: the commands arrive without keys and can be bound to anything from Obsidian's hotkey settings, where your own assignments win either way. Every command stays available from the command palette.",
+    "Register the plugin's own single-Alt bindings in one go — Alt+P play/pause, Alt+X play from marker, Alt+Z set marker, Alt+B / Alt+N previous and next track, and so on, each also bound for the Russian layout. On the numeric keypad Alt+× and Alt+÷ change the key while Alt++ and Alt+− change the tempo, so the player sits under one hand. The switch takes effect at once — try a key straight away, no reload. Off: the commands arrive without keys and can be bound to anything from Obsidian's hotkey settings, where your own assignments win either way. Every command stays available from the command palette.",
+  hotkeysOn: "Songwriter: the built-in hotkeys are on. Try one — no reload needed.",
+  hotkeysOff: "Songwriter: the built-in hotkeys are off. The commands stay in the palette.",
   hotkeysReloadHint: "Songwriter: the hotkeys change once the plugin is reloaded (or Obsidian restarts).",
   headingFine: "Fine tuning",
   setMediaKeysName: "Media keys",
@@ -263,7 +265,9 @@ const ru: typeof en = {
   headingHotkeys: "Горячие клавиши",
   setHotkeysName: "Использовать встроенные хоткеи",
   setHotkeysDesc:
-    "Регистрировать собственные сочетания плагина на одиночном Alt — Alt+P плей/пауза, Alt+X играть с маркера, Alt+Z поставить маркер, Alt+B и Alt+N предыдущий и следующий трек и так далее, каждое продублировано для русской раскладки. Выключено — команды приходят без клавиш, и повесить их можно на что угодно в настройках горячих клавиш Obsidian; ваши собственные назначения в любом случае важнее умолчаний. Все команды при этом остаются доступны из палитры.",
+    "Разом включить собственные сочетания плагина на одиночном Alt — Alt+P плей/пауза, Alt+X играть с маркера, Alt+Z поставить маркер, Alt+B и Alt+N предыдущий и следующий трек и так далее, каждое продублировано для русской раскладки. На нумпаде Alt+× и Alt+÷ меняют тональность, Alt++ и Alt+− — темп, так что весь плеер оказывается под одной рукой. Переключатель срабатывает сразу — можно тут же пробовать клавишу, перезагрузка не нужна. Выключено — команды приходят без клавиш, и повесить их можно на что угодно в настройках горячих клавиш Obsidian; ваши собственные назначения в любом случае важнее умолчаний. Все команды при этом остаются доступны из палитры.",
+  hotkeysOn: "Songwriter: встроенные горячие клавиши включены. Можно сразу пробовать — перезагрузка не нужна.",
+  hotkeysOff: "Songwriter: встроенные горячие клавиши выключены. Команды остаются в палитре.",
   hotkeysReloadHint: "Songwriter: горячие клавиши изменятся после перезагрузки плагина (или перезапуска Obsidian).",
   headingFine: "Тонкая настройка",
   setMediaKeysName: "Медиа-клавиши",

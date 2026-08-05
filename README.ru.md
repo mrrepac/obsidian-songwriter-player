@@ -40,6 +40,9 @@
 | Транспонировать вниз / вверх на полутон (только ПК) | `Alt+PageDown` / `Alt+PageUp` |
 | Играть как записано — и скорость, и тональность | `Alt+0` |
 
+**На нумпаде** все четыре лежат рядом, под одной рукой: `Alt+÷` и `Alt+×` —
+тональность вниз и вверх, `Alt+−` и `Alt++` — темп.
+
 Без дефолтных клавиш: Clear marker, Clear A-B loop zone, Load audio from current note, Open player panel, Unload track, Open track in default app, Reveal track in system explorer.
 
 ## Настройки

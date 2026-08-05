@@ -80,6 +80,9 @@ duplicated out of the box.
 | Transpose down / up a semitone (desktop only) | `Alt+PageDown` / `Alt+PageUp` |
 | Play as recorded again — speed and key | `Alt+0` |
 
+**On the numeric keypad** the four of them sit together, under one hand:
+`Alt+÷` / `Alt+×` transpose down and up, `Alt+−` / `Alt++` step the tempo.
+
 Without default keys: Clear marker, Clear A-B loop zone, Load audio from current
 note, Open player panel, Unload track, Open track in default app, Reveal track in
 system explorer.
