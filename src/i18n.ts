@@ -62,6 +62,9 @@ const en = {
   playlistCountTitle: (n: number) => `${n} audio files`,
   rowMarkerTitle: "The track has a marker",
   rowDragHint: "Drag into a note for a link — hold Alt to drag the file out",
+  copyToNote: "Copy to current note",
+  copiedToNote: (name: string) => `Songwriter: copied “${name}” into the note.`,
+  copyFailed: "Songwriter: could not copy the track.",
 
   // tempo & key
   analyseHint: "Tempo and key are not measured yet — click to measure",
@@ -203,6 +206,9 @@ const ru: typeof en = {
   playlistCountTitle: (n: number) => `Аудиофайлов: ${n}`,
   rowMarkerTitle: "У трека есть маркер",
   rowDragHint: "Перетащи в заметку — вставится ссылка; с Alt — сам файл наружу",
+  copyToNote: "Скопировать в текущую заметку",
+  copiedToNote: (name: string) => `Songwriter: «${name}» скопирован в заметку.`,
+  copyFailed: "Songwriter: не удалось скопировать трек.",
 
   analyseHint: "Темп и тональность ещё не измерены — нажми, чтобы измерить",
   analysing: "Считаю темп и тональность…",

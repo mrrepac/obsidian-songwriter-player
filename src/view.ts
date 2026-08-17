@@ -613,6 +613,15 @@ export class SongwriterView extends ItemView {
         if (f.path === this.engine.file?.path) void this.engine.playPause();
         else void this.engine.load(f, { autoplay: this.engine.playing });
       });
+      row.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        const menu = new Menu();
+        menu.addItem((item) => item
+          .setTitle(t("copyToNote"))
+          .setIcon("copy")
+          .onClick(() => void this.plugin.copyTrackToNote(f)));
+        menu.showAtMouseEvent(e);
+      });
       this.makeRowDraggable(row, f);
     });
   }

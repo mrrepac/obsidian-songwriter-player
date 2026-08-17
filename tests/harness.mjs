@@ -71,6 +71,7 @@ export function obsidianStub(over = {}) {
     Notice: class {},
     Platform: { isMobile: false, isDesktop: true, isDesktopApp: true },
     TFile: Empty,
+    TFolder: Empty,
     ItemView: Empty,
     PluginSettingTab: Empty,
     MarkdownView: Empty,

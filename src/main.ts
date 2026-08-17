@@ -4,6 +4,7 @@ import { analyseMusical, foldIntoWindow } from "./musical";
 import { renderTransposed, renderedName } from "./render";
 import { t } from "./i18n";
 import { openExternally, revealInExplorer } from "./external";
+import { copyTrackToNote as copyIntoNote } from "./copy";
 import { EmbedPlayers } from "./embed";
 import { decidePickup } from "./pickup";
 import { PlayerEngine } from "./engine";
@@ -299,6 +300,13 @@ export default class SongwriterPlugin extends Plugin {
       name: "Open track's note",
       hotkeys: this.keys("open-track-note"),
       callback: () => this.openTrackNote()
+    });
+
+    // no default hotkey: the built-in key table is already at fourteen commands
+    this.addCommand({
+      id: "copy-track-to-note",
+      name: "Copy track to current note",
+      callback: () => void this.copyTrackToNote()
     });
 
     this.addCommand({
@@ -679,6 +687,23 @@ export default class SongwriterPlugin extends Plugin {
     } else {
       await this.app.workspace.getLeaf(false).openFile(target);
     }
+  }
+
+  /**
+   * File the loaded track into the note being looked at, without touching
+   * playback — filing is not listening, so the folder keeps playing through it.
+   */
+  async copyTrackToNote(file: TFile | null = this.engine.file): Promise<void> {
+    if (!file) {
+      new Notice(t("noTrack"));
+      return;
+    }
+    const note = this.app.workspace.getActiveFile();
+    if (!note || note.extension !== "md") {
+      new Notice(t("noActiveNote"));
+      return;
+    }
+    await copyIntoNote(this.app, this, file, note);
   }
 
   // ---- view ----
