@@ -27,6 +27,12 @@ export interface PickupDecision {
  * audio file is — that is a hand on the file, not a side effect of reading. The
  * "auto" mode sits outside the rule on purpose: it is called "always pick up",
  * and whoever chose it asked for exactly that.
+ *
+ * The two "nothing to load" checks run before the hold takes effect: a note
+ * for the track already playing is not a request to switch to it, so it must
+ * not surface an offer either. Held or not, the queue answer is the same —
+ * `setQueue` only ever depends on whether the note's own track is being held
+ * back, never on whether there was anything left to load.
  */
 export function decidePickup(input: PickupInput): PickupDecision {
   const { kind, playing, mode, currentPath, targetPath, queuePaths } = input;
@@ -36,14 +42,14 @@ export function decidePickup(input: PickupInput): PickupDecision {
   const held = kind === "note-audio" && playing && mode !== "auto";
   const setQueue = !held;
 
-  if (held) return { setQueue, action: mode === "hybrid" ? "offer" : "none" };
-
   // already the loaded track, or already inside the queue this open builds —
-  // nothing to load either way
+  // nothing to load either way, whether or not the hold below would apply
   if (currentPath === targetPath) return { setQueue, action: "none" };
   if (kind === "note-audio" && currentPath && queuePaths.includes(currentPath)) {
     return { setQueue, action: "none" };
   }
+
+  if (held) return { setQueue, action: mode === "hybrid" ? "offer" : "none" };
 
   switch (mode) {
     case "auto": return { setQueue, action: "load" };

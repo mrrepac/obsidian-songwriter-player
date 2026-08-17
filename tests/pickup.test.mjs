@@ -47,6 +47,20 @@ export default async function run() {
     return d.action === "none" && d.setQueue === true;
   });
 
+  // ---- the playing track's own note is not a request to switch to itself ----
+  s.check("opening the playing track's own note offers nothing", () => {
+    const d = decide({ playing: true, targetPath: "songs/demo.mp3", currentPath: "songs/demo.mp3" });
+    return d.action === "none";
+  });
+  s.check("and does not touch the queue either", () => {
+    const d = decide({ playing: true, targetPath: "songs/demo.mp3", currentPath: "songs/demo.mp3" });
+    return d.setQueue === false;
+  });
+  s.check("nor does a note whose list holds the playing track further down", () => {
+    const d = decide({ playing: true, currentPath: "songs/second.mp3" });
+    return d.action === "none" && d.setQueue === false;
+  });
+
   // ---- a note with no audio belongs to nobody ----
   s.check("a note without audio changes nothing", () => {
     const d = decide({ kind: "note-empty" });
