@@ -111,6 +111,16 @@ export default async function run() {
     return d.action === "none" && d.setQueue === true;
   });
 
+  // ---- the note of the track already playing asks for nothing ----
+  s.check("opening the playing track's own note offers nothing",
+    () => decide({ targetPath: "beats/01.mp3" }).action === "none");
+  s.check("and does not touch the queue either",
+    () => decide({ targetPath: "beats/01.mp3" }).setQueue === false);
+  s.check("same when the playing track sits further down the note's list", () => {
+    const d = decide({ currentPath: "songs/second.mp3" });
+    return d.action === "none" && d.setQueue === false;
+  });
+
   // ---- a note with no audio belongs to nobody ----
   s.check("a note without audio changes nothing", () => {
     const d = decide({ kind: "note-empty" });
@@ -180,14 +190,16 @@ export function decidePickup(input: PickupInput): PickupDecision {
   const held = kind === "note-audio" && playing && mode !== "auto";
   const setQueue = !held;
 
-  if (held) return { setQueue, action: mode === "hybrid" ? "offer" : "none" };
-
   // already the loaded track, or already inside the queue this open builds —
-  // nothing to load either way
+  // nothing to load either way. This comes before the hold: offering to switch
+  // to the track that is already playing is nonsense, and that is exactly what
+  // opening its own note used to do.
   if (currentPath === targetPath) return { setQueue, action: "none" };
   if (kind === "note-audio" && currentPath && queuePaths.includes(currentPath)) {
     return { setQueue, action: "none" };
   }
+
+  if (held) return { setQueue, action: mode === "hybrid" ? "offer" : "none" };
 
   switch (mode) {
     case "auto": return { setQueue, action: "load" };
