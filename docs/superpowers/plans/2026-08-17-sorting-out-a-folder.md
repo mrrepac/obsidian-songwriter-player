@@ -527,7 +527,12 @@ export async function copyTrackToNote(
     ? await manager.getAvailablePathForAttachment(file.name, note.path)
     : `${note.parent?.path ?? ""}/${file.name}`;
 
-  const folder = await ensureFolder(app, suggested.slice(0, suggested.lastIndexOf("/")));
+  // no slash means the attachment folder is the vault root — a real setting
+  // ("same folder as current file" with the note at the root). Splitting on a
+  // missing slash would cut the last letter off the file name and then create
+  // a folder called that.
+  const slash = suggested.lastIndexOf("/");
+  const folder = await ensureFolder(app, slash === -1 ? "" : suggested.slice(0, slash));
   const existing = folder.children
     .filter((c): c is TFile => c instanceof TFile)
     .map(c => ({ name: c.name, size: c.stat.size }));
@@ -577,6 +582,12 @@ async function ensureFolder(app: App, path: string): Promise<TFolder> {
   return found ?? await app.vault.createFolder(path);
 }
 ```
+
+**Всё, что пишет в хранилище, обёрнуто в `try`/`catch`** — создание копии,
+запись настроек, вставка ссылки. `createBinary` не возвращает признак неудачи,
+она бросает: без обёртки отказ уходит в несработавший промис, и человек не
+видит ничего. В `catch` — `console.error` в голосе этого проекта
+(`"Songwriter: …"`) и `Notice` с `copyFailed`.
 
 **Плеер не трогается** — ни `load`, ни `setQueue`: прослушивание папки
 продолжается, копия уезжает молча.
