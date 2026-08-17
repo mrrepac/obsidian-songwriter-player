@@ -42,6 +42,14 @@ export class SongwriterView extends ItemView {
    * fetched ahead of time, on mousedown, and held as an object URL.
    */
   private dragFile: { path: string; url: string } | null = null;
+  /**
+   * The path of a readBinary() in flight. Two mousedowns can land before the
+   * first read resolves; without this, both would pass prepareDragFile's
+   * early-return guard and the URL of whichever loses the race would never be
+   * revoked. The one that matters is the one asked for last, not the one that
+   * happens to resolve first.
+   */
+  private dragPending: string | null = null;
   private static readonly DRAG_MIME: Record<string, string> = {
     mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4", ogg: "audio/ogg",
     opus: "audio/ogg", flac: "audio/flac", aac: "audio/aac", webm: "audio/webm",
@@ -289,7 +297,11 @@ export class SongwriterView extends ItemView {
       // an aria-label would replace it with the explanation. title stays,
       // because it is read as a description rather than as the name.
       name.setAttribute("role", "button");
-      name.title = t("openTrackNoteTitle");
+      // same "\n"-joined pair buildPlaylistRows puts in a playlist row's
+      // title: the click behavior, then the drag hint the gesture needs since
+      // nothing else here announces it — no aria-label, see the comment on
+      // sortBtn above
+      name.title = `${t("openTrackNoteTitle")}\n${t("rowDragHint")}`;
       name.addEventListener("click", () => {
         void this.plugin.openTrackNote();
       });
@@ -541,6 +553,11 @@ export class SongwriterView extends ItemView {
     this.sortBtn = head.createEl("button", { cls: "clickable-icon sw-icon-btn sw-playlist-sort" });
     setIcon(this.sortBtn, "arrow-up-down");
     this.sortBtn.setAttribute("aria-label", t("sortTitle"));
+    // the head above carries its own title for the collapse/expand gesture;
+    // an empty title here overrides that inheritance per spec, so hovering
+    // the button draws only Obsidian's aria-label tooltip, not both at once —
+    // same rule as transportBtn above (see the comment at its definition)
+    this.sortBtn.title = "";
     // the button sits inside the head, which toggles collapse on click — this
     // is a different gesture and must not also fold the list
     this.sortBtn.addEventListener("click", (e) => {
@@ -731,8 +748,11 @@ export class SongwriterView extends ItemView {
     row.draggable = true;
     // the bytes have to be in hand when the gesture starts, and reading them
     // on hover means reading the whole pack while the mouse wanders down the
-    // list
-    row.addEventListener("mousedown", () => void this.prepareDragFile(file));
+    // list. Button 0 only — a right click just opens the context menu, and
+    // reading the whole file for a menu it will never drag is wasted work
+    row.addEventListener("mousedown", (e) => {
+      if (e.button === 0) void this.prepareDragFile(file);
+    });
     row.addEventListener("dragstart", (e) => {
       // Alt takes the native, on-disk route instead of the ordinary drag
       if (e.altKey && dragOutNatively(this.app, file)) {
@@ -758,11 +778,21 @@ export class SongwriterView extends ItemView {
 
   /** Read one track's bytes and keep them as an object URL, ready for a drag. */
   private async prepareDragFile(file: TFile) {
-    if (this.dragFile?.path === file.path) return;
-    this.releaseDragFile();
+    if (this.dragFile?.path === file.path || this.dragPending === file.path) return;
+    this.dragPending = file.path;
     const bytes = await this.app.vault.readBinary(file);
     const mime = SongwriterView.DRAG_MIME[file.extension.toLowerCase()] ?? "application/octet-stream";
-    this.dragFile = { path: file.path, url: URL.createObjectURL(new Blob([bytes], { type: mime })) };
+    const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+    if (this.dragPending !== file.path) {
+      // a later mousedown moved on to another row while this read was in
+      // flight — this one lost the race, so its URL is revoked unused rather
+      // than pinning the Blob for the life of the document
+      URL.revokeObjectURL(url);
+      return;
+    }
+    this.dragPending = null;
+    this.releaseDragFile();
+    this.dragFile = { path: file.path, url };
   }
 
   private releaseDragFile() {

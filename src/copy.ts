@@ -86,8 +86,14 @@ export async function copyTrackToNote(
     const link = app.fileManager.generateMarkdownLink(copy, note.path);
     const embed = link.startsWith("!") ? link : `!${link}`;
     const view = app.workspace.getActiveViewOfType(MarkdownView);
-    if (view && view.file?.path === note.path) view.editor.replaceSelection(embed);
-    else await app.vault.append(note, `\n${embed}\n`);
+    // Reading view returns a MarkdownView too, but its editor is not the one
+    // on screen — a replaceSelection there lands nowhere, so only source mode
+    // gets the cursor-position insert; anything else falls back to appending
+    if (view && view.file?.path === note.path && view.getMode() === "source") {
+      view.editor.replaceSelection(embed);
+    } else {
+      await app.vault.append(note, `\n${embed}\n`);
+    }
 
     new Notice(t("copiedToNote")(copy.name));
   } catch (e) {

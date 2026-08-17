@@ -55,5 +55,8 @@ export function decidePickup(input: PickupInput): PickupDecision {
     case "auto": return { setQueue, action: "load" };
     case "hybrid": return { setQueue, action: playing ? "offer" : "load" };
     case "manual": return { setQueue, action: "none" };
+    // data.json is unvalidated user data — a stale or hand-edited pickupMode
+    // must stay a no-op, the way it always was, not a thrown TypeError
+    default: return { setQueue, action: "none" };
   }
 }

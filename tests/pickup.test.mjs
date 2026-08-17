@@ -77,5 +77,12 @@ export default async function run() {
     return d.action === "none" && d.setQueue === true;
   });
 
+  // ---- data.json can hold anything: a stale or hand-edited pickupMode must
+  // not be a thrown TypeError on every file open ----
+  s.check("a garbage mode still returns a usable decision instead of throwing", () => {
+    const d = decide({ mode: "garbage-value", playing: false });
+    return d.setQueue === true && d.action === "none";
+  });
+
   return s.report();
 }
