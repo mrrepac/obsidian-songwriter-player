@@ -50,6 +50,17 @@ export class SongwriterSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }));
 
+    new Setting(containerEl)
+      .setName(t("setLoopZonesName"))
+      .setDesc(t("setLoopZonesDesc"))
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.loopZones)
+        .onChange(async (value) => {
+          this.plugin.settings.loopZones = value;
+          await this.plugin.saveSettings();
+          this.plugin.refreshViews();
+        }));
+
     new Setting(containerEl).setName(t("headingPlaylist")).setHeading();
 
     new Setting(containerEl)

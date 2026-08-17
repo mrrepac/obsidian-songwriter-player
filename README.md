@@ -23,13 +23,17 @@ not in the UI).
   - drag a zone edge — move it (the cursor turns into ↔).
 - **Marker (⚑)** — one point per track: mark the spot you keep coming back to while
   working on a song. "Play from marker" always starts there (with no marker — from the
-  start). The marker is remembered per file.
+  start). The marker is remembered per file, and the ⚑ button in the track row drops
+  it again — it appears only while there is one to drop.
 - **A-B loop zone** — a selected fragment of the waveform plays in a loop; the zone
   start automatically becomes the marker, so "Play from marker" restarts the loop from
   its beginning. Seeking outside the zone by hand does not drag you back — the loop
   only kicks in when playback itself reaches the B edge. The zone is remembered per
   file; clear it by clicking outside it or with the Clear A-B loop zone command (the
-  marker stays).
+  marker stays). If zones only get in your way, switch them off in settings: a drag
+  across the waveform stops selecting one, saved zones are ignored, and a track that
+  has one plays through to the next instead of circling. Nothing is deleted — turning
+  the setting back on brings the zones back.
 - **Playlist** — open a note holding several audio files and they line up as its
   playlist; open an audio file and every audio file next to it in the folder does.
   The list sits under the player (collapsible, remembers its state): the current

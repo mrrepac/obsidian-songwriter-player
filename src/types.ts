@@ -65,6 +65,8 @@ export interface SongwriterSettings {
   mediaKeys: boolean;
   /** register the built-in single-Alt hotkeys; off leaves every command bare */
   defaultHotkeys: boolean;
+  /** off: no zone is drawn, a drag cannot create one, and nothing loops */
+  loopZones: boolean;
   folderQueue: boolean;
   autoAdvance: boolean;
   playlistCollapsed: boolean;
@@ -92,6 +94,7 @@ export const DEFAULT_SETTINGS: SongwriterSettings = {
   // off for a fresh install; loadSettings turns it on for a vault upgrading
   // from a version where these keys were baked into the commands
   defaultHotkeys: false,
+  loopZones: true,
   folderQueue: true,
   autoAdvance: false,
   playlistCollapsed: false,

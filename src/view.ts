@@ -67,6 +67,7 @@ export class SongwriterView extends ItemView {
   private prevBtn: HTMLButtonElement;
   private nextBtn: HTMLButtonElement;
   private playsEl: HTMLElement | null = null;
+  private markerBtn: HTMLElement | null = null;
   private emptyEl: HTMLElement;
   private contentRoot: HTMLElement;
 
@@ -161,6 +162,7 @@ export class SongwriterView extends ItemView {
       this.updatePlays();
       this.updateMusical();
       this.updatePlaylistRow();
+      this.updateMarkerBtn();
       this.wave?.markDirty();
     }));
     this.registerEvent(this.engine.on("queue-changed", () => {
@@ -287,6 +289,7 @@ export class SongwriterView extends ItemView {
     this.trackRow.empty();
     this.playsEl = null;
     this.musicalEl = null;
+    this.markerBtn = null;
     const file = this.engine.file;
     const icon = this.trackRow.createSpan({ cls: "sw-track-icon" });
     setIcon(icon, "music");
@@ -334,6 +337,14 @@ export class SongwriterView extends ItemView {
         e.preventDefault();
         revealInExplorer(this.app, file);
       });
+
+      // only there while there is a marker to clear: until now the only way to
+      // drop one was three taps of the stop key, which nobody finds by hand
+      this.markerBtn = this.trackRow.createEl("button", { cls: "clickable-icon sw-icon-btn sw-marker-clear" });
+      setIcon(this.markerBtn, "flag-off");
+      this.markerBtn.setAttribute("aria-label", t("clearMarkerTitle"));
+      this.markerBtn.addEventListener("click", () => this.engine.clearMarker());
+      this.updateMarkerBtn();
 
       const ejectBtn = this.trackRow.createEl("button", { cls: "clickable-icon sw-icon-btn sw-eject" });
       setIcon(ejectBtn, "arrow-up-from-line");
@@ -823,6 +834,14 @@ export class SongwriterView extends ItemView {
     els.plays.setText(data?.plays ? `▶ ${data.plays}` : "");
     const key = formatKey(data?.key, data?.scale);
     els.musical.setText(data?.bpm != null ? (key ? `${data.bpm} ${key}` : String(data.bpm)) : "");
+  }
+
+  /** The clear-marker button exists only while the track actually has one. */
+  private updateMarkerBtn() {
+    if (!this.markerBtn) return;
+    const path = this.engine.file?.path;
+    const marker = path ? this.plugin.settings.tracks[path]?.marker : null;
+    this.markerBtn.toggle(marker !== null && marker !== undefined);
   }
 
   private updatePlaylistRow() {

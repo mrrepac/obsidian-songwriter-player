@@ -119,6 +119,7 @@ export class WaveformRenderer {
   }
 
   private get shownLoop(): { a: number; b: number } | null {
+    if (!this.plugin.settings.loopZones) return null;
     if (this.active) return this.engine.loop;
     const d = this.trackData();
     if (!d || d.loopA === null || d.loopB === null) return null;
@@ -271,7 +272,10 @@ export class WaveformRenderer {
     });
 
     this.wrap.addEventListener("pointermove", (e) => {
-      if (mode === "maybe-click" && Math.abs(e.clientX - downX) > DRAG_THRESHOLD_PX) {
+      // with zones switched off a drag stays a click: no zone is born from a
+      // slip of the hand, which is what made them a nuisance rather than a tool
+      if (mode === "maybe-click" && this.plugin.settings.loopZones
+        && Math.abs(e.clientX - downX) > DRAG_THRESHOLD_PX) {
         mode = "select";
       }
       if (mode === "select") {

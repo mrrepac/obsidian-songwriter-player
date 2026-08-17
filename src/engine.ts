@@ -463,6 +463,11 @@ export class PlayerEngine extends Events {
   // ---- A-B loop zone ----
 
   get loop(): { a: number; b: number } | null {
+    // one gate for the whole feature: with zones switched off nothing loops and
+    // nothing is drawn, so the playlist plays through instead of circling. A
+    // zone saved earlier stays in the file, waiting to be switched back on
+    // rather than quietly deleted.
+    if (!this.plugin.settings.loopZones) return null;
     const d = this.peekData();
     if (!d || d.loopA === null || d.loopB === null) return null;
     return { a: d.loopA, b: d.loopB };
