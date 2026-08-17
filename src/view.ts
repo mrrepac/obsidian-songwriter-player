@@ -1,7 +1,7 @@
 import { ItemView, Menu, Platform, WorkspaceLeaf, TFile, setIcon } from "obsidian";
 import type SongwriterPlugin from "./main";
 import { PlayerEngine } from "./engine";
-import { EXT_BTN_TITLE, openExternally, revealInExplorer } from "./external";
+import { EXT_BTN_TITLE, dragOutNatively, openExternally, revealInExplorer } from "./external";
 import { WaveformRenderer } from "./waveform";
 import { KEY_PROFILES } from "./musical";
 import { playTriad } from "./tone";
@@ -35,6 +35,17 @@ export class SongwriterView extends ItemView {
   }>();
   /** Paths currently laid out, so an unchanged playlist is never rebuilt. */
   private renderedPaths: string[] = [];
+  /**
+   * PROBE (1.8.0): dragging a track out of Obsidian has to hand the file over
+   * the moment the gesture starts — the browser will not wait for a read. So
+   * the bytes are fetched ahead of time and held as an object URL.
+   */
+  private dragFile: { path: string; url: string } | null = null;
+  private static readonly DRAG_MIME: Record<string, string> = {
+    mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4", ogg: "audio/ogg",
+    opus: "audio/ogg", flac: "audio/flac", aac: "audio/aac", webm: "audio/webm",
+    wma: "audio/x-ms-wma", "3gp": "audio/3gpp"
+  };
   /** The row marked as playing, so a track change touches two rows, not all. */
   private currentRowPath: string | null = null;
   private musicalEl: HTMLElement | null = null;
@@ -72,6 +83,13 @@ export class SongwriterView extends ItemView {
     const root = this.contentEl;
     root.empty();
     root.addClass("sw-root");
+
+    // PROBE (1.8.0): report what actually leaves the app, once every handler
+    // above the row — ours and Obsidian's own — has had its say.
+    this.registerDomEvent(document, "dragstart", (e) => {
+      const types = e.dataTransfer ? Array.from(e.dataTransfer.types) : [];
+      console.log("[songwriter probe] leaving with:", types.join(" | ") || "(nothing)");
+    });
 
     this.emptyEl = root.createDiv({ cls: "sw-empty" });
     this.emptyEl.createDiv({ text: t("emptyTitle") });
@@ -166,6 +184,7 @@ export class SongwriterView extends ItemView {
   async onClose() {
     this.wave?.destroy();
     this.wave = null;
+    this.releaseDragFile();
   }
 
   private buildTransport(parent: HTMLElement) {
@@ -653,15 +672,46 @@ export class SongwriterView extends ItemView {
    */
   private makeRowDraggable(row: HTMLElement, file: TFile) {
     row.draggable = true;
+    // PROBE (1.8.0): start reading before the gesture does, so dragstart has
+    // something to hand over. Landing on the row is the earliest honest signal.
+    row.addEventListener("mouseenter", () => void this.prepareDragFile(file));
     row.addEventListener("dragstart", (e) => {
+      // PROBE (1.8.0): Alt takes the native route, so the ordinary drag keeps
+      // working while both are compared
+      if (e.altKey && dragOutNatively(this.app, file)) {
+        e.preventDefault();
+        row.removeClass("is-dragging");
+        return;
+      }
       const active = this.app.workspace.getActiveFile();
       const link = this.app.fileManager.generateMarkdownLink(file, active?.path ?? "");
       const embed = link.startsWith("!") ? link : `!${link}`;
       e.dataTransfer?.setData("text/plain", embed);
+      // PROBE (1.8.0): the file itself, for everything outside Obsidian. An app
+      // that understands neither form simply ignores it.
+      if (e.dataTransfer && this.dragFile?.path === file.path) {
+        const mime = SongwriterView.DRAG_MIME[file.extension.toLowerCase()] ?? "application/octet-stream";
+        e.dataTransfer.setData("DownloadURL", `${mime}:${file.name}:${this.dragFile.url}`);
+      }
       if (e.dataTransfer) e.dataTransfer.effectAllowed = "copy";
       row.addClass("is-dragging");
     });
     row.addEventListener("dragend", () => row.removeClass("is-dragging"));
+  }
+
+  /** PROBE (1.8.0): read one track's bytes and keep them as an object URL. */
+  private async prepareDragFile(file: TFile) {
+    if (this.dragFile?.path === file.path) return;
+    this.releaseDragFile();
+    const bytes = await this.app.vault.readBinary(file);
+    const mime = SongwriterView.DRAG_MIME[file.extension.toLowerCase()] ?? "application/octet-stream";
+    this.dragFile = { path: file.path, url: URL.createObjectURL(new Blob([bytes], { type: mime })) };
+  }
+
+  private releaseDragFile() {
+    if (!this.dragFile) return;
+    URL.revokeObjectURL(this.dragFile.url);
+    this.dragFile = null;
   }
 
   /** Marker flag + play count for one row, straight from saved track data. */

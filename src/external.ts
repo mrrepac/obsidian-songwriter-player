@@ -1,5 +1,41 @@
-import { App, Notice, Platform, TFile } from "obsidian";
+import { App, FileSystemAdapter, Notice, Platform, TFile } from "obsidian";
 import { t } from "./i18n";
+
+/**
+ * PROBE (1.8.0): hand a track to the system the way the file explorer does —
+ * as a path on disk, not as bytes from memory. Chromium's own drag offers a
+ * virtual file, which the desktop accepts and REAPER ignores; a path is the
+ * only form REAPER understands. Returns false when the native route is not
+ * available, so the caller can fall back to the ordinary drag.
+ */
+export function dragOutNatively(app: App, file: TFile): boolean {
+  if (!Platform.isDesktopApp) return false;
+  const adapter = app.vault.adapter;
+  if (!(adapter instanceof FileSystemAdapter)) return false;
+  const req = (window as unknown as { require?: (id: string) => any }).require;
+  if (!req) return false;
+
+  try {
+    const { nativeImage } = req("electron");
+    const webContents = req("@electron/remote").getCurrentWebContents();
+    const path = adapter.getFullPath(file.path);
+    // an icon is mandatory: a 1×1 image is the cheapest non-empty one, and
+    // createEmpty covers the platforms that reject it
+    try {
+      webContents.startDrag({ file: path, icon: nativeImage.createFromDataURL(DRAG_PIXEL) });
+    } catch {
+      webContents.startDrag({ file: path, icon: nativeImage.createEmpty() });
+    }
+    console.log("[songwriter probe] native drag started:", path);
+    return true;
+  } catch (e) {
+    console.error("[songwriter probe] native drag failed", e);
+    return false;
+  }
+}
+
+const DRAG_PIXEL =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
 /** Private App APIs that exist at runtime but are missing from obsidian.d.ts. */
 interface AppPrivate extends App {
