@@ -1,4 +1,4 @@
-import { App, Hotkey, MarkdownView, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
+import { App, Hotkey, MarkdownView, Notice, Plugin, TFile, WorkspaceLeaf, normalizePath } from "obsidian";
 import { DEFAULT_SETTINGS, QueueSource, SongwriterSettings, TrackData, emptyTrackData, isAudioPath } from "./types";
 import { sortTracks } from "./playlist";
 import { analyseMusical, foldIntoWindow } from "./musical";
@@ -737,8 +737,47 @@ export default class SongwriterPlugin extends Plugin {
 
   // ---- persistence ----
 
+  /**
+   * A data.json we could not read is never written over. Obsidian's own
+   * loadData() swallows a parse error and hands back nothing, which reads as
+   * "fresh install" — and the next unload would replace years of markers,
+   * counters and measurements with defaults. So the file is read here instead,
+   * and one that will not parse latches this flag and stops every save.
+   */
+  private dataUnreadable = false;
+
+  /**
+   * Read data.json ourselves, rescuing a damaged one instead of losing it.
+   * Returns null when there is genuinely nothing to load — a fresh install.
+   */
+  private async readDataFile(): Promise<unknown> {
+    const dir = this.manifest.dir;
+    if (!dir) return this.loadData(); // nowhere to look: fall back to the API
+    const path = normalizePath(`${dir}/data.json`);
+    const adapter = this.app.vault.adapter;
+    if (!(await adapter.exists(path))) return null;
+
+    const text = await adapter.read(path);
+    if (text.trim() === "") return null;
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      console.error("Songwriter: could not parse data.json", e);
+      // the damaged text is copied aside before anything else can touch it; if
+      // even that fails, the notice is what the user has to act on
+      try {
+        await adapter.write(normalizePath(`${dir}/data.json.bak`), text);
+      } catch (writeError) {
+        console.error("Songwriter: could not save data.json.bak", writeError);
+      }
+      this.dataUnreadable = true;
+      new Notice(t("dataUnreadable"), 0); // stays until dismissed
+      return null;
+    }
+  }
+
   async loadSettings() {
-    const raw = await this.loadData();
+    const raw = await this.readDataFile();
     const loaded = (raw ?? {}) as LegacySettings;
     // migrate from v0.1.0 (startPoint + named markers); `rate` (playback
     // speed, removed for now), the withdrawn beat-grid settings and old
@@ -798,6 +837,9 @@ export default class SongwriterPlugin extends Plugin {
   }
 
   async saveSettings() {
+    // the file on disk holds data we failed to read; writing defaults over it
+    // would destroy the only copy
+    if (this.dataUnreadable) return;
     for (const [path, d] of Object.entries(this.settings.tracks)) {
       const noStats = !d.plays && (d.playedSec ?? 0) < 5;
       // measured tempo/key counts as content too — it costs seconds of

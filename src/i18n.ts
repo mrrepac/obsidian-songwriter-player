@@ -28,6 +28,7 @@ const en = {
   revealFailed: "Songwriter: could not reveal the file in the system explorer.",
   audioNotFound: "Songwriter: could not find the audio file.",
   noActiveNote: "Songwriter: no active note.",
+  dataUnreadable: "Songwriter: data.json could not be read, so your markers, loop zones and counters are not loaded. A copy has been kept as data.json.bak, and nothing will be written over the file until it is repaired or removed.",
   noAudioInNote: "Songwriter: the note has no audio files.",
   trackNoteNotFound: "Songwriter: no note with this track was found.",
 
@@ -180,6 +181,7 @@ const ru: typeof en = {
   revealFailed: "Songwriter: не удалось показать файл в проводнике.",
   audioNotFound: "Songwriter: не удалось найти аудиофайл.",
   noActiveNote: "Songwriter: нет активной заметки.",
+  dataUnreadable: "Songwriter: не удалось прочитать data.json, поэтому маркеры, зоны повтора и счётчики не загружены. Копия сохранена как data.json.bak, и файл не будет перезаписан, пока вы его не почините или не удалите.",
   noAudioInNote: "Songwriter: в заметке нет аудиофайлов.",
   trackNoteNotFound: "Songwriter: заметка с этим треком не найдена.",
 

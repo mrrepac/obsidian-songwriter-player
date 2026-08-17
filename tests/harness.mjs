@@ -80,6 +80,7 @@ export function obsidianStub(over = {}) {
     WorkspaceLeaf: Empty,
     App: Empty,
     setIcon() {},
+    normalizePath: (p) => p,
     moment: { locale: () => "en" },
     ...over
   };

@@ -32,11 +32,31 @@ export default async function run() {
   const exports = load(source, { modules: { obsidian }, globals: browserGlobals() });
   const SongwriterPlugin = exports.default ?? exports;
 
+  // The plugin reads data.json off the adapter rather than through loadData(),
+  // so that a file it cannot parse can be rescued instead of replaced. These
+  // tests therefore need a disk to read from.
+  const DIR = "plugins/songwriter-player";
+  const DATA = `${DIR}/data.json`;
+  let files = {};
+  const adapter = {
+    async exists(path) { return path in files; },
+    async read(path) { return files[path]; },
+    async write(path, text) { files[path] = text; }
+  };
+  /** A plugin wired to the fake disk above. */
+  const makePlugin = () => {
+    const plugin = new SongwriterPlugin();
+    plugin.manifest = { dir: DIR };
+    plugin.app = { vault: { adapter } };
+    return plugin;
+  };
+
   /** Load a data.json, save it straight back, and report both ends. */
   const roundTrip = async (data) => {
     stored = data;
+    files = data === null ? {} : { [DATA]: JSON.stringify(data) };
     saved = null;
-    const plugin = new SongwriterPlugin();
+    const plugin = makePlugin();
     await plugin.loadSettings();
     // snapshot: saveSettings prunes in place, so holding the live object would
     // blur "the load dropped it" into "the save pruned it" — and those are two
@@ -154,6 +174,27 @@ export default async function run() {
 
     const declined = await roundTrip({ defaultHotkeys: false, tracks: {} });
     s.check("a choice already made is not overruled", () => declined.loaded.defaultHotkeys === false);
+  }
+
+  // ---- a file we cannot read is rescued, never written over ----
+  {
+    // Obsidian's own loadData() swallows a parse error and returns nothing,
+    // which is indistinguishable from a fresh install — and the next unload
+    // would then replace years of markers and counters with defaults.
+    const damaged = '{"tracks":{"beat.mp3":{"marker":11.5,';
+    files = { [DATA]: damaged };
+    saved = null;
+    const quiet = console.error;
+    console.error = () => {}; // the parse failure is reported on purpose; keep the run's output clean
+    const plugin = makePlugin();
+    await plugin.loadSettings();
+    await plugin.saveSettings();
+    console.error = quiet;
+
+    s.check("a truncated data.json is copied aside", () => files[`${DATA}.bak`] === damaged);
+    s.check("the original is left exactly as it was", () => files[DATA] === damaged);
+    s.check("and no save writes defaults over it", () => saved === null);
+    s.check("the plugin still comes up on defaults", () => plugin.settings.pickupMode === "hybrid");
   }
 
   return s.report();
