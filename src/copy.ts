@@ -37,44 +37,55 @@ export function pickCopyTarget(input: CopyInput): CopyTarget {
 export async function copyTrackToNote(
   app: App, plugin: SongwriterPlugin, file: TFile, note: TFile
 ): Promise<void> {
-  const manager = app.fileManager as unknown as FileManagerMaybe;
-  const suggested = typeof manager.getAvailablePathForAttachment === "function"
-    ? await manager.getAvailablePathForAttachment(file.name, note.path)
-    : `${note.parent?.path ?? ""}/${file.name}`;
+  try {
+    const manager = app.fileManager as unknown as FileManagerMaybe;
+    const suggested = typeof manager.getAvailablePathForAttachment === "function"
+      ? await manager.getAvailablePathForAttachment(file.name, note.path)
+      : `${note.parent?.path ?? ""}/${file.name}`;
 
-  const folder = await ensureFolder(app, suggested.slice(0, suggested.lastIndexOf("/")));
-  const existing = folder.children
-    .filter((c): c is TFile => c instanceof TFile)
-    .map(c => ({ name: c.name, size: c.stat.size }));
-  const { reuse } = pickCopyTarget({
-    sourceName: file.name, sourceSize: file.stat.size, existing
-  });
+    // no "/" means the attachment sits at the vault root, not in a folder
+    // named after a mangled filename — slice(0, -1) would silently do that
+    const slash = suggested.lastIndexOf("/");
+    const folder = await ensureFolder(app, slash === -1 ? "" : suggested.slice(0, slash));
+    const existing = folder.children
+      .filter((c): c is TFile => c instanceof TFile)
+      .map(c => ({ name: c.name, size: c.stat.size }));
+    const { reuse } = pickCopyTarget({
+      sourceName: file.name, sourceSize: file.stat.size, existing
+    });
 
-  const path = folder.path ? `${folder.path}/${reuse ?? file.name}` : (reuse ?? file.name);
-  let copy = app.vault.getAbstractFileByPath(path);
-  if (!(copy instanceof TFile)) {
-    copy = await app.vault.createBinary(suggested, await app.vault.readBinary(file));
-  }
-  if (!(copy instanceof TFile)) {
+    const path = folder.path ? `${folder.path}/${reuse ?? file.name}` : (reuse ?? file.name);
+    let copy = app.vault.getAbstractFileByPath(path);
+    if (!(copy instanceof TFile)) {
+      copy = await app.vault.createBinary(suggested, await app.vault.readBinary(file));
+    }
+    if (!(copy instanceof TFile)) {
+      new Notice(t("copyFailed"));
+      return;
+    }
+
+    // the copy inherits marker, loop, counters and measurements: without them
+    // it is a stranger to the plugin and gets analysed all over again
+    const data = plugin.settings.tracks[file.path];
+    if (data && !plugin.settings.tracks[copy.path]) {
+      plugin.settings.tracks[copy.path] = { ...data };
+      await plugin.saveSettings();
+    }
+
+    const link = app.fileManager.generateMarkdownLink(copy, note.path);
+    const embed = link.startsWith("!") ? link : `!${link}`;
+    const view = app.workspace.getActiveViewOfType(MarkdownView);
+    if (view && view.file?.path === note.path) view.editor.replaceSelection(embed);
+    else await app.vault.append(note, `\n${embed}\n`);
+
+    new Notice(t("copiedToNote")(copy.name));
+  } catch (e) {
+    // createBinary/append/createFolder all reject rather than resolve on a
+    // real failure (permissions, an existing-file clash, a vanished source) —
+    // uncaught, that is a silent no-op with no Notice at all
+    console.error("Songwriter: failed to copy track to note", e);
     new Notice(t("copyFailed"));
-    return;
   }
-
-  // the copy inherits marker, loop, counters and measurements: without them it
-  // is a stranger to the plugin and gets analysed all over again
-  const data = plugin.settings.tracks[file.path];
-  if (data && !plugin.settings.tracks[copy.path]) {
-    plugin.settings.tracks[copy.path] = { ...data };
-    await plugin.saveSettings();
-  }
-
-  const link = app.fileManager.generateMarkdownLink(copy, note.path);
-  const embed = link.startsWith("!") ? link : `!${link}`;
-  const view = app.workspace.getActiveViewOfType(MarkdownView);
-  if (view && view.file?.path === note.path) view.editor.replaceSelection(embed);
-  else await app.vault.append(note, `\n${embed}\n`);
-
-  new Notice(t("copiedToNote")(copy.name));
 }
 
 /**
