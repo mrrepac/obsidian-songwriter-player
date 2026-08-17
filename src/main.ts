@@ -5,6 +5,7 @@ import { renderTransposed, renderedName } from "./render";
 import { t } from "./i18n";
 import { openExternally, revealInExplorer } from "./external";
 import { EmbedPlayers } from "./embed";
+import { decidePickup } from "./pickup";
 import { PlayerEngine } from "./engine";
 import { MediaSessionBridge } from "./mediasession";
 import { MobileMarkerButton } from "./mobilefab";
@@ -410,62 +411,51 @@ export default class SongwriterPlugin extends Plugin {
 
     let audios: TFile[];
     let source: QueueSource | null;
-    let target: TFile;
-    /** An audio file was opened by hand: that exact file wins over the queue. */
-    let explicit: boolean;
     /** The note the target would belong to — applied only if it actually loads. */
     let noteSource: TFile | null;
+    const audio = isAudioPath(file.path);
 
-    if (isAudioPath(file.path)) {
+    if (audio) {
       audios = this.settings.folderQueue ? this.collectFolderAudios(file) : [file];
       source = audios.length > 1 && file.parent
         ? { kind: "folder", name: file.parent.name || "/", path: file.parent.path }
         : null;
-      target = file;
-      explicit = true;
       noteSource = null;
     } else if (file.extension === "md") {
       audios = this.collectNoteAudios(file);
-      if (audios.length === 0) {
-        // a note without audio (lyrics, a diary page) leaves the playlist
-        // alone: it belongs to the loaded track, not to the note being read
-        this.engine.setPendingSwitch(null);
-        return;
-      }
       noteSource = file;
       source = { kind: "note", name: file.basename, path: file.path };
-      target = audios[0];
-      explicit = false;
     } else {
       return;
     }
 
-    this.engine.setQueue(audios, source);
+    // target is absent only for a note with no audio in it; decidePickup
+    // covers that case itself, so the missing target never reaches a load
+    const target: TFile | null = audio ? file : (audios[0] ?? null);
 
-    const current = this.engine.file;
-    if (current && current.path === target.path) {
-      this.engine.setPendingSwitch(null);
-      return;
-    }
-    // a note whose audio is already loaded keeps playing — only an explicitly
-    // opened audio file overrides the current track
-    if (!explicit && current && audios.some(f => f.path === current.path)) {
-      this.engine.setPendingSwitch(null);
-      return;
-    }
+    const decision = decidePickup({
+      kind: audio ? "audio" : (audios.length === 0 ? "note-empty" : "note-audio"),
+      playing: this.engine.playing,
+      mode: this.settings.pickupMode,
+      currentPath: this.engine.file?.path ?? null,
+      targetPath: target?.path ?? "",
+      queuePaths: audios.map(f => f.path)
+    });
+
+    if (decision.setQueue) this.engine.setQueue(audios, source);
 
     // the note association travels with the load, so merely opening a file
     // that does not become the track (manual mode, an offer left unanswered,
     // the track already playing) leaves "open track's note" pointing where it did
-    switch (this.settings.pickupMode) {
-      case "auto":
-        void this.engine.load(target, { autoplay: this.engine.playing, sourceNote: noteSource });
+    switch (decision.action) {
+      case "load":
+        if (target) void this.engine.load(target, { autoplay: this.engine.playing, sourceNote: noteSource });
         break;
-      case "hybrid":
-        if (this.engine.playing) this.engine.setPendingSwitch(target, noteSource);
-        else void this.engine.load(target, { sourceNote: noteSource });
+      case "offer":
+        if (target) this.engine.setPendingSwitch(target, noteSource);
         break;
-      case "manual":
+      case "none":
+        this.engine.setPendingSwitch(null);
         break;
     }
   }
