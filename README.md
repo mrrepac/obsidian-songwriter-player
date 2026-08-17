@@ -45,6 +45,17 @@ not in the UI).
   browser drag offers. `Alt`-dragging into Obsidian itself does nothing — that is
   the deliberate cost of splitting the two gestures. The native handoff is
   desktop-only; on mobile there is no such route.
+- **Order the playlist** — the button in the playlist header sorts it by name,
+  tempo, play count or how recently the file changed; the chosen order is what
+  `⏮ ⏭` walk, and it is remembered. Folder playlists only: a playlist built from
+  a note keeps the order the note itself gives it.
+- **Copy a track into the note you are looking at** — the `Copy track to current
+  note` command, or the same item in a playlist row's right-click menu. The copy
+  lands in the vault's own attachment folder and is embedded in the note as a
+  waveform; the track's marker, loop zone, counters and measured tempo and key
+  come with it. Playback is not interrupted — filing is not listening. Sending
+  the same track again links the copy that is already there instead of making a
+  twin.
 - **Play count and total listened time** — next to the track name (`▶ 27 · 2h40m`).
   A run only counts once 5 seconds have actually sounded (start-and-stop does not
   count; pause-and-resume keeps accumulating). Every loop-zone pass is a new run.
@@ -91,8 +102,8 @@ duplicated out of the box.
 `Alt+÷` / `Alt+×` transpose down and up, `Alt+−` / `Alt++` step the tempo.
 
 Without default keys: Clear marker, Clear A-B loop zone, Load audio from current
-note, Open player panel, Unload track, Open track in default app, Reveal track in
-system explorer.
+note, Open player panel, Unload track, Copy track to current note, Open track in
+default app, Reveal track in system explorer.
 
 ## Settings
 

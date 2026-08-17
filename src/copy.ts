@@ -58,7 +58,10 @@ export async function copyTrackToNote(
     // reuse === null means a different track already sits under that name, so
     // looking up "folder/<source name>" there would find that unrelated file
     // and skip the create entirely, handing the note the wrong track
-    const base = folder.path ? `${folder.path}/` : "";
+    // isRoot(), not a truthy path: the vault root's path is "/", so a truthy
+    // check builds "//" there and every lookup misses — which would silently
+    // undo the dedup exactly when the attachment folder is the vault root
+    const base = folder.isRoot() ? "" : `${folder.path}/`;
     // suggested's directory came from the vault's raw attachment-folder
     // setting; folder.path is the same directory resolved case-insensitively
     // by ensureFolder, so the create path is rebuilt from folder.path and only

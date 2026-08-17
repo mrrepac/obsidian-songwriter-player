@@ -186,6 +186,10 @@ export class SongwriterView extends ItemView {
   async onClose() {
     this.wave?.destroy();
     this.wave = null;
+    // clearing the pending path, not just the held file: a read still in
+    // flight would otherwise resolve into a closed view and mint an object
+    // URL with nothing left to revoke it
+    this.dragPending = null;
     this.releaseDragFile();
   }
 
