@@ -8,8 +8,9 @@ import mediasession from "./mediasession.test.mjs";
 import hotkeys from "./hotkeys.test.mjs";
 import pickup from "./pickup.test.mjs";
 import copy from "./copy.test.mjs";
+import playlist from "./playlist.test.mjs";
 
-const suites = [settings, mediasession, hotkeys, pickup, copy];
+const suites = [settings, mediasession, hotkeys, pickup, copy, playlist];
 
 let ok = true;
 for (const run of suites) {

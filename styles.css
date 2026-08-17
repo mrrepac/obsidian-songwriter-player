@@ -540,6 +540,15 @@ body.sw-hide-embed-buttons .sw-embed-ext {
   color: var(--text-faint);
 }
 
+.sw-playlist-sort {
+  flex-shrink: 0;
+}
+
+.sw-playlist-sort svg {
+  width: 14px;
+  height: 14px;
+}
+
 .sw-playlist-list {
   display: flex;
   flex-direction: column;

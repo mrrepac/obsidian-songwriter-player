@@ -65,6 +65,11 @@ const en = {
   copyToNote: "Copy to current note",
   copiedToNote: (name: string) => `Songwriter: copied “${name}” into the note.`,
   copyFailed: "Songwriter: could not copy the track.",
+  sortTitle: "Order the playlist",
+  sortByName: "By name",
+  sortByTempo: "By tempo, slowest first",
+  sortByPlays: "By plays, most played first",
+  sortByRecent: "By age, newest first",
 
   // tempo & key
   analyseHint: "Tempo and key are not measured yet — click to measure",
@@ -209,6 +214,11 @@ const ru: typeof en = {
   copyToNote: "Скопировать в текущую заметку",
   copiedToNote: (name: string) => `Songwriter: «${name}» скопирован в заметку.`,
   copyFailed: "Songwriter: не удалось скопировать трек.",
+  sortTitle: "Порядок плейлиста",
+  sortByName: "По имени",
+  sortByTempo: "По темпу, медленные сначала",
+  sortByPlays: "По прослушиваниям, частые сначала",
+  sortByRecent: "По давности, новые сначала",
 
   analyseHint: "Темп и тональность ещё не измерены — нажми, чтобы измерить",
   analysing: "Считаю темп и тональность…",

@@ -36,6 +36,9 @@ export function emptyTrackData(): TrackData {
 
 export type PickupMode = "hybrid" | "auto" | "manual";
 
+/** How a folder playlist is ordered. A note playlist ignores this — it keeps the author's order. */
+export type PlaylistSort = "name" | "tempo" | "plays" | "recent";
+
 /** Mobile floating-button tap behavior. */
 export type FabMode = "marker" | "smart";
 
@@ -65,6 +68,8 @@ export interface SongwriterSettings {
   folderQueue: boolean;
   autoAdvance: boolean;
   playlistCollapsed: boolean;
+  /** order of a folder playlist; a note playlist always keeps the note's own order */
+  playlistSort: PlaylistSort;
   autoAnalyse: boolean;
   /** lower edge of the preferred tempo octave: 80 means 80…159 */
   tempoWindowLow: number;
@@ -90,6 +95,7 @@ export const DEFAULT_SETTINGS: SongwriterSettings = {
   folderQueue: true,
   autoAdvance: false,
   playlistCollapsed: false,
+  playlistSort: "name",
   autoAnalyse: true,
   tempoWindowLow: 80,
   tracks: {}

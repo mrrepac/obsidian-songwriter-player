@@ -1,5 +1,6 @@
 import { App, Hotkey, MarkdownView, Notice, Platform, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf } from "obsidian";
 import { DEFAULT_SETTINGS, QueueSource, SongwriterSettings, TrackData, emptyTrackData, isAudioPath } from "./types";
+import { sortTracks } from "./playlist";
 import { analyseMusical, foldIntoWindow } from "./musical";
 import { renderTransposed, renderedName } from "./render";
 import { t } from "./i18n";
@@ -485,14 +486,22 @@ export default class SongwriterPlugin extends Plugin {
     }
   }
 
-  /** Every audio file sitting next to this one, in file-explorer-ish order. */
+  /** Every audio file sitting next to this one, ordered by the current playlist sort. */
   collectFolderAudios(file: TFile): TFile[] {
     const parent = file.parent;
     if (!parent) return [file];
-    const out = parent.children
-      .filter((c): c is TFile => c instanceof TFile && isAudioPath(c.path))
-      .sort((a, b) => a.basename.localeCompare(b.basename, undefined, { numeric: true, sensitivity: "base" }));
-    return out.length > 0 ? out : [file];
+    const audios = parent.children
+      .filter((c): c is TFile => c instanceof TFile && isAudioPath(c.path));
+    if (audios.length === 0) return [file];
+    const byPath = new Map(audios.map(f => [f.path, f]));
+    const sorted = sortTracks(
+      audios.map(f => {
+        const d = this.settings.tracks[f.path];
+        return { path: f.path, basename: f.basename, mtime: f.stat.mtime, bpm: d?.bpm ?? null, plays: d?.plays ?? 0 };
+      }),
+      this.settings.playlistSort
+    );
+    return sorted.map(track => byPath.get(track.path)!);
   }
 
   collectNoteAudios(note: TFile): TFile[] {

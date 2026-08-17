@@ -7,7 +7,7 @@ import { KEY_PROFILES } from "./musical";
 import { playTriad } from "./tone";
 import { transposeKey } from "./pitch";
 import { renderedName } from "./render";
-import { formatKey, formatPlayed, formatTime } from "./types";
+import { PlaylistSort, formatKey, formatPlayed, formatTime } from "./types";
 import { t } from "./i18n";
 
 export const VIEW_TYPE_SONGWRITER = "songwriter-player";
@@ -24,6 +24,7 @@ export class SongwriterView extends ItemView {
   private playlistIcon: HTMLElement;
   private playlistTitle: HTMLElement;
   private playlistCount: HTMLElement;
+  private sortBtn: HTMLElement;
   private playlistChevron: HTMLElement;
   private playlistRows = new Map<string, {
     row: HTMLElement;
@@ -537,6 +538,15 @@ export class SongwriterView extends ItemView {
     this.playlistIcon = head.createSpan({ cls: "sw-playlist-icon" });
     this.playlistTitle = head.createSpan({ cls: "sw-playlist-title" });
     this.playlistCount = head.createSpan({ cls: "sw-playlist-count" });
+    this.sortBtn = head.createEl("button", { cls: "clickable-icon sw-icon-btn sw-playlist-sort" });
+    setIcon(this.sortBtn, "arrow-up-down");
+    this.sortBtn.setAttribute("aria-label", t("sortTitle"));
+    // the button sits inside the head, which toggles collapse on click — this
+    // is a different gesture and must not also fold the list
+    this.sortBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.onSortClick();
+    });
     this.playlistChevron = head.createSpan({ cls: "sw-playlist-chevron" });
     head.addEventListener("click", () => {
       this.plugin.settings.playlistCollapsed = !this.plugin.settings.playlistCollapsed;
@@ -579,6 +589,9 @@ export class SongwriterView extends ItemView {
       : "";
     this.playlistCount.setText(String(queue.length));
     this.playlistCount.title = t("playlistCountTitle")(queue.length);
+    // a note dictates its own order — the author's sequence — so reordering
+    // only ever applies (and only ever offers itself) to a folder playlist
+    this.sortBtn.toggle(source?.kind === "folder");
     this.applyPlaylistCollapsed();
 
     // Rebuilding the rows throws away the list's scroll position, so it only
@@ -593,6 +606,42 @@ export class SongwriterView extends ItemView {
       this.renderedPaths = paths;
     }
     this.updatePlaylistCurrent();
+  }
+
+  // ---- playlist order ----
+
+  private onSortClick() {
+    const menu = new Menu();
+    const current = this.plugin.settings.playlistSort;
+    const options: [PlaylistSort, string][] = [
+      ["name", t("sortByName")],
+      ["tempo", t("sortByTempo")],
+      ["plays", t("sortByPlays")],
+      ["recent", t("sortByRecent")]
+    ];
+    for (const [sort, label] of options) {
+      menu.addItem((item) => item
+        .setTitle(label)
+        .setChecked(current === sort)
+        .onClick(() => this.setPlaylistSort(sort)));
+    }
+    const rect = this.sortBtn.getBoundingClientRect();
+    menu.showAtPosition({ x: rect.left, y: rect.bottom + 4 });
+  }
+
+  /**
+   * Rebuilds the queue through the exact same path collectFolderAudios takes,
+   * so the rows on screen and the sequence ⏮/⏭ step through never disagree.
+   */
+  private setPlaylistSort(sort: PlaylistSort) {
+    if (this.plugin.settings.playlistSort === sort) return;
+    this.plugin.settings.playlistSort = sort;
+    void this.plugin.saveSettings();
+    const source = this.engine.queueSource;
+    const anchor = this.engine.queue[0];
+    if (source?.kind === "folder" && anchor) {
+      this.engine.setQueue(this.plugin.collectFolderAudios(anchor), source);
+    }
   }
 
   private buildPlaylistRows(queue: TFile[]) {
