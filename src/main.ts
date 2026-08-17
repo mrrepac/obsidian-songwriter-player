@@ -346,6 +346,23 @@ export default class SongwriterPlugin extends Plugin {
 
     this.registerEvent(this.app.workspace.on("file-open", (file) => this.handleFileOpen(file)));
 
+    // A click already opens the file, and that goes through the pickup rule. A
+    // double click is a second, louder statement: play it. The explorer's markup
+    // is not public API, so a miss here means the gesture quietly does nothing.
+    this.registerDomEvent(document, "dblclick", (e) => {
+      const title = (e.target as HTMLElement)?.closest?.(".nav-file-title");
+      const path = title?.getAttribute("data-path");
+      if (!path || !isAudioPath(path)) return;
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (!(file instanceof TFile)) return;
+      this.engine.setPendingSwitch(null);
+      this.engine.setQueue(
+        this.settings.folderQueue ? this.collectFolderAudios(file) : [file],
+        file.parent ? { kind: "folder", name: file.parent.name || "/", path: file.parent.path } : null
+      );
+      void this.engine.load(file, { autoplay: true });
+    });
+
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
       if (!(file instanceof TFile)) return;
       if (this.settings.tracks[oldPath]) {
