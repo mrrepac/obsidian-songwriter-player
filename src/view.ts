@@ -602,9 +602,8 @@ export class SongwriterView extends ItemView {
     queue.forEach((f, index) => {
       const row = this.playlistList.createDiv({ cls: "sw-pl-row" });
       row.setAttribute("role", "button");
-      row.setAttribute("aria-label", t("rowDragHint"));
       const num = row.createSpan({ cls: "sw-pl-num", text: String(index + 1) });
-      row.createSpan({ cls: "sw-pl-name", text: f.basename, title: f.path });
+      row.createSpan({ cls: "sw-pl-name", text: f.basename, title: `${f.path}\n${t("rowDragHint")}` });
       const flag = row.createSpan({ cls: "sw-pl-flag" });
       const musical = row.createSpan({ cls: "sw-pl-musical" });
       const plays = row.createSpan({ cls: "sw-pl-plays" });
