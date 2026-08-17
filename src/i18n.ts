@@ -61,6 +61,7 @@ const en = {
   playlistFromFolder: "Playlist of the folder",
   playlistCountTitle: (n: number) => `${n} audio files`,
   rowMarkerTitle: "The track has a marker",
+  rowDragHint: "Drag into a note for a link — hold Alt to drag the file out",
 
   // tempo & key
   analyseHint: "Tempo and key are not measured yet — click to measure",
@@ -201,6 +202,7 @@ const ru: typeof en = {
   playlistFromFolder: "Плейлист папки",
   playlistCountTitle: (n: number) => `Аудиофайлов: ${n}`,
   rowMarkerTitle: "У трека есть маркер",
+  rowDragHint: "Перетащи в заметку — вставится ссылка; с Alt — сам файл наружу",
 
   analyseHint: "Темп и тональность ещё не измерены — нажми, чтобы измерить",
   analysing: "Считаю темп и тональность…",

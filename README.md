@@ -38,6 +38,13 @@ not in the UI).
   `⏮ ⏭` walk the list, and the list survives ejecting the track, so you can pick
   the next one from it. Optionally the playlist plays through on its own; a track
   with an A-B zone keeps looping instead.
+- **Drag a track out** — drag a row (or the loaded track's name) into a note and
+  it drops in as a link; hold `Alt` while dragging and the file itself goes out
+  instead — to the system file explorer, the desktop, or an audio editor such as
+  REAPER, which only accepts a real file on disk, not the virtual one an ordinary
+  browser drag offers. `Alt`-dragging into Obsidian itself does nothing — that is
+  the deliberate cost of splitting the two gestures. The native handoff is
+  desktop-only; on mobile there is no such route.
 - **Play count and total listened time** — next to the track name (`▶ 27 · 2h40m`).
   A run only counts once 5 seconds have actually sounded (start-and-stop does not
   count; pause-and-resume keeps accumulating). Every loop-zone pass is a new run.

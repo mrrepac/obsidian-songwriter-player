@@ -36,9 +36,9 @@ export class SongwriterView extends ItemView {
   /** Paths currently laid out, so an unchanged playlist is never rebuilt. */
   private renderedPaths: string[] = [];
   /**
-   * PROBE (1.8.0): dragging a track out of Obsidian has to hand the file over
-   * the moment the gesture starts — the browser will not wait for a read. So
-   * the bytes are fetched ahead of time and held as an object URL.
+   * Dragging a track out of Obsidian has to hand the file over the moment the
+   * gesture starts — the browser will not wait for a read. So the bytes are
+   * fetched ahead of time, on mousedown, and held as an object URL.
    */
   private dragFile: { path: string; url: string } | null = null;
   private static readonly DRAG_MIME: Record<string, string> = {
@@ -83,13 +83,6 @@ export class SongwriterView extends ItemView {
     const root = this.contentEl;
     root.empty();
     root.addClass("sw-root");
-
-    // PROBE (1.8.0): report what actually leaves the app, once every handler
-    // above the row — ours and Obsidian's own — has had its say.
-    this.registerDomEvent(document, "dragstart", (e) => {
-      const types = e.dataTransfer ? Array.from(e.dataTransfer.types) : [];
-      console.log("[songwriter probe] leaving with:", types.join(" | ") || "(nothing)");
-    });
 
     this.emptyEl = root.createDiv({ cls: "sw-empty" });
     this.emptyEl.createDiv({ text: t("emptyTitle") });
@@ -609,6 +602,7 @@ export class SongwriterView extends ItemView {
     queue.forEach((f, index) => {
       const row = this.playlistList.createDiv({ cls: "sw-pl-row" });
       row.setAttribute("role", "button");
+      row.setAttribute("aria-label", t("rowDragHint"));
       const num = row.createSpan({ cls: "sw-pl-num", text: String(index + 1) });
       row.createSpan({ cls: "sw-pl-name", text: f.basename, title: f.path });
       const flag = row.createSpan({ cls: "sw-pl-flag" });
@@ -665,19 +659,25 @@ export class SongwriterView extends ItemView {
   }
 
   /**
-   * Drag a playlist row into a note and drop an embed of that track there.
-   * The link is built by Obsidian itself, so it follows the vault's link
-   * format (wikilink or markdown, shortest or relative path); the leading "!"
-   * makes it an embed, which this plugin renders as a waveform player.
+   * Drag a row two ways, split by the Alt key. Plain drag targets a note: it
+   * carries a link built by Obsidian itself (wikilink or markdown, shortest
+   * or relative path per the vault's settings; the leading "!" makes it an
+   * embed, which this plugin renders as a waveform player) alongside the raw
+   * bytes as a DownloadURL, so dropping on the desktop saves the file and
+   * dropping in a note inserts the embed. Alt+drag instead hands the file to
+   * dragOutNatively, which reaches apps that want a real path on disk (REAPER
+   * ignores the virtual file Chromium offers otherwise) — dropping that
+   * gesture into a note does nothing, which is the deliberate price of the
+   * split.
    */
   private makeRowDraggable(row: HTMLElement, file: TFile) {
     row.draggable = true;
-    // PROBE (1.8.0): start reading before the gesture does, so dragstart has
-    // something to hand over. Landing on the row is the earliest honest signal.
-    row.addEventListener("mouseenter", () => void this.prepareDragFile(file));
+    // the bytes have to be in hand when the gesture starts, and reading them
+    // on hover means reading the whole pack while the mouse wanders down the
+    // list
+    row.addEventListener("mousedown", () => void this.prepareDragFile(file));
     row.addEventListener("dragstart", (e) => {
-      // PROBE (1.8.0): Alt takes the native route, so the ordinary drag keeps
-      // working while both are compared
+      // Alt takes the native, on-disk route instead of the ordinary drag
       if (e.altKey && dragOutNatively(this.app, file)) {
         e.preventDefault();
         row.removeClass("is-dragging");
@@ -687,8 +687,8 @@ export class SongwriterView extends ItemView {
       const link = this.app.fileManager.generateMarkdownLink(file, active?.path ?? "");
       const embed = link.startsWith("!") ? link : `!${link}`;
       e.dataTransfer?.setData("text/plain", embed);
-      // PROBE (1.8.0): the file itself, for everything outside Obsidian. An app
-      // that understands neither form simply ignores it.
+      // the file itself, for everything outside Obsidian; an app that
+      // understands neither form simply ignores it
       if (e.dataTransfer && this.dragFile?.path === file.path) {
         const mime = SongwriterView.DRAG_MIME[file.extension.toLowerCase()] ?? "application/octet-stream";
         e.dataTransfer.setData("DownloadURL", `${mime}:${file.name}:${this.dragFile.url}`);
@@ -699,7 +699,7 @@ export class SongwriterView extends ItemView {
     row.addEventListener("dragend", () => row.removeClass("is-dragging"));
   }
 
-  /** PROBE (1.8.0): read one track's bytes and keep them as an object URL. */
+  /** Read one track's bytes and keep them as an object URL, ready for a drag. */
   private async prepareDragFile(file: TFile) {
     if (this.dragFile?.path === file.path) return;
     this.releaseDragFile();

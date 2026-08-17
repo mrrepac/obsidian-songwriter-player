@@ -2,11 +2,12 @@ import { App, FileSystemAdapter, Notice, Platform, TFile } from "obsidian";
 import { t } from "./i18n";
 
 /**
- * PROBE (1.8.0): hand a track to the system the way the file explorer does —
- * as a path on disk, not as bytes from memory. Chromium's own drag offers a
- * virtual file, which the desktop accepts and REAPER ignores; a path is the
- * only form REAPER understands. Returns false when the native route is not
- * available, so the caller can fall back to the ordinary drag.
+ * Hand a track to the system the way the file explorer does — as a path on
+ * disk, not as bytes from memory. Chromium's own drag offers a virtual file,
+ * which the desktop accepts and REAPER ignores; a path is the only form
+ * REAPER understands. Returns false when the native route is not available
+ * (mobile, no `require`, vault not on disk), so the caller can fall back to
+ * the ordinary drag.
  */
 export function dragOutNatively(app: App, file: TFile): boolean {
   if (!Platform.isDesktopApp) return false;
@@ -26,10 +27,10 @@ export function dragOutNatively(app: App, file: TFile): boolean {
     } catch {
       webContents.startDrag({ file: path, icon: nativeImage.createEmpty() });
     }
-    console.log("[songwriter probe] native drag started:", path);
     return true;
   } catch (e) {
-    console.error("[songwriter probe] native drag failed", e);
+    // a silent failure here would look like a drag that simply did nothing
+    console.error("Songwriter: native drag failed", e);
     return false;
   }
 }
