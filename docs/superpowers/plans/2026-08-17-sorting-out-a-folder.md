@@ -127,7 +127,7 @@ export default async function run() {
     return d.action === "none" && d.setQueue === true;
   });
 
-  return s.done();
+  return s.report();
 }
 ```
 
@@ -432,7 +432,7 @@ export default async function run() {
   s.check("an empty folder is copied into",
     () => pickCopyTarget({ sourceName: "beat.mp3", sourceSize: 4096, existing: [] }).reuse === null);
 
-  return s.done();
+  return s.report();
 }
 ```
 
@@ -644,7 +644,7 @@ export default async function run() {
     return files[0].path === "b.mp3";
   });
 
-  return s.done();
+  return s.report();
 }
 ```
 
