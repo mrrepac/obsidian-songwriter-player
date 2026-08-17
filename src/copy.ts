@@ -54,10 +54,21 @@ export async function copyTrackToNote(
       sourceName: file.name, sourceSize: file.stat.size, existing
     });
 
-    const path = folder.path ? `${folder.path}/${reuse ?? file.name}` : (reuse ?? file.name);
-    let copy = app.vault.getAbstractFileByPath(path);
-    if (!(copy instanceof TFile)) {
-      copy = await app.vault.createBinary(suggested, await app.vault.readBinary(file));
+    // the probe has to follow pickCopyTarget's verdict, not the source name:
+    // reuse === null means a different track already sits under that name, so
+    // looking up "folder/<source name>" there would find that unrelated file
+    // and skip the create entirely, handing the note the wrong track
+    const base = folder.path ? `${folder.path}/` : "";
+    // suggested's directory came from the vault's raw attachment-folder
+    // setting; folder.path is the same directory resolved case-insensitively
+    // by ensureFolder, so the create path is rebuilt from folder.path and only
+    // the leaf name is kept from suggested (slice(slash + 1) also works when
+    // slash === -1, i.e. suggested is already a bare filename)
+    const freeName = suggested.slice(slash + 1);
+    const found = reuse ? app.vault.getAbstractFileByPath(`${base}${reuse}`) : null;
+    let copy: TFile | null = found instanceof TFile ? found : null;
+    if (!copy) {
+      copy = await app.vault.createBinary(`${base}${freeName}`, await app.vault.readBinary(file));
     }
     if (!(copy instanceof TFile)) {
       new Notice(t("copyFailed"));
