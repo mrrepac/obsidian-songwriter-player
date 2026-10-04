@@ -998,6 +998,7 @@ export class SongwriterView extends ItemView {
     // the track being measured right now — by the batch button or by hand —
     // is marked in the list, so a long batch shows where it is
     const analysing = this.plugin.isAnalysing(path);
+    const started = analysing && !els.row.hasClass("is-analysing");
     els.row.toggleClass("is-analysing", analysing);
     if (analysing) {
       // setIcon adds to what is there, so the old text has to go first
@@ -1019,6 +1020,12 @@ export class SongwriterView extends ItemView {
     els.verdict.setAttribute("aria-label",
       t("verdictRowLabel")(t(verdict ? VERDICT_UI[verdict].label : "verdictNew")));
     els.row.toggle(rowVisible(els.name, verdict, this.plugin.settings.playlistFilter, this.query));
+    // follow a batch down the list — once per track, when its measurement
+    // starts, so the refills during it never yank the list back; "nearest"
+    // leaves the list alone while the row is already in sight
+    if (started && els.row.isShown() && !this.plugin.settings.playlistCollapsed) {
+      els.row.scrollIntoView({ block: "nearest" });
+    }
   }
 
   /** Every row, then the counters and the "nothing matches" line that depend on them. */
