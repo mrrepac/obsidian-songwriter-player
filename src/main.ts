@@ -183,12 +183,6 @@ export default class SongwriterPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: "clear-loop",
-      name: "Clear A-B loop zone",
-      callback: () => this.engine.clearLoop()
-    });
-
-    this.addCommand({
       id: "seek-back",
       name: "Seek back",
       hotkeys: this.keys("seek-back"),
@@ -812,8 +806,6 @@ export default class SongwriterPlugin extends Plugin {
       const firstMarker = Array.isArray(raw.markers) ? raw.markers[0]?.time : undefined;
       this.settings.tracks[path] = {
         marker: raw.marker !== undefined ? raw.marker : raw.startPoint ?? firstMarker ?? null,
-        loopA: raw.loopA ?? null,
-        loopB: raw.loopB ?? null,
         plays: typeof raw.plays === "number" ? raw.plays : 0,
         playedSec: typeof raw.playedSec === "number" ? raw.playedSec : 0,
         bpm: raw.bpm ?? null,
@@ -881,7 +873,7 @@ export default class SongwriterPlugin extends Plugin {
       // so does a chosen speed or key: they are the whole point of the record
       // for a track being practised, even before it has a marker or a play
       const noPlayback = d.rate === undefined && d.semitones === undefined;
-      if (d.marker === null && d.loopA === null && noStats && noMusical && noPlayback) {
+      if (d.marker === null && noStats && noMusical && noPlayback) {
         delete this.settings.tracks[path];
       }
     }

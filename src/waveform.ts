@@ -6,8 +6,7 @@ import { TrackData, formatTime } from "./types";
 import { t } from "./i18n";
 
 /**
- * Canvas waveform: click to play, double click to set the marker, drag to
- * select or resize the A-B loop zone. Peaks come from the shared analysis
+ * Canvas waveform: click to play, double click to set the marker. Peaks come from the shared analysis
  * module (one decode per file); playback itself goes through the engine's
  * <audio>, not Web Audio.
  *
@@ -15,7 +14,7 @@ import { t } from "./i18n";
  *  - the sidebar renderer *follows the engine*: it always shows whatever track
  *    is loaded and is always "active" (full interaction, live playhead);
  *  - an inline (`bound`) renderer is pinned to one file. It draws that file's
- *    peaks, marker and zone from saved data, but only reflects the engine's
+ *    peaks and marker from saved data, but only reflects the engine's
  *    playhead while its file is the loaded track. When it is not, a tap asks
  *    the host to make it the active track (`onActivate`).
  */
@@ -39,7 +38,6 @@ export class WaveformRenderer {
   private dirty = true;
   private lastDrawnTime = -1;
   private resizeObserver: ResizeObserver;
-  private dragZone: { a: number; b: number } | null = null;
   private colors = { base: "#888", played: "#7aa2f7", cursor: "#7aa2f7", marker: "#e0a03c" };
 
   onTick: (() => void) | null = null;
@@ -132,14 +130,6 @@ export class WaveformRenderer {
   private trackData(): TrackData | null {
     const path = this.bound ? this.shownFile?.path : this.engine.file?.path;
     return path ? this.plugin.settings.tracks[path] ?? null : null;
-  }
-
-  private get shownLoop(): { a: number; b: number } | null {
-    if (!this.plugin.settings.loopZones) return null;
-    if (this.active) return this.engine.loop;
-    const d = this.trackData();
-    if (!d || d.loopA === null || d.loopB === null) return null;
-    return { a: d.loopA, b: d.loopB };
   }
 
   /** Host hook (bound renderers): re-evaluate active state when the loaded
@@ -239,19 +229,10 @@ export class WaveformRenderer {
   }
 
   // ---- interaction ----
-  // single click: play from there · double click: set marker
-  // drag on empty space: select an A-B loop zone · drag a zone edge: resize it
-  // an inactive bound waveform ignores all of this — a tap just activates it.
+  // single click: play from there · double click: set the marker.
+  // An inactive bound waveform ignores both — a tap just activates it.
 
   private bindPointer() {
-    const DRAG_THRESHOLD_PX = 5;
-    const EDGE_GRAB_PX = 7;
-    const MIN_ZONE_SEC = 0.2;
-    type Mode = "idle" | "maybe-click" | "select" | "resize-a" | "resize-b";
-    let mode: Mode = "idle";
-    let downX = 0;
-    let downTime = 0;
-
     const timeAtX = (clientX: number): number => {
       const rect = this.wrap.getBoundingClientRect();
       const x = Math.min(Math.max(clientX - rect.left, 0), rect.width);
@@ -259,84 +240,17 @@ export class WaveformRenderer {
       return rect.width > 0 ? (x / rect.width) * d : 0;
     };
 
-    const edgeAt = (clientX: number): "a" | "b" | null => {
-      const lp = this.engine.loop;
-      const d = this.dur;
-      if (!lp || d <= 0) return null;
-      const rect = this.wrap.getBoundingClientRect();
-      if (rect.width === 0) return null;
-      const px = clientX - rect.left;
-      const xA = (lp.a / d) * rect.width;
-      const xB = (lp.b / d) * rect.width;
-      if (Math.abs(px - xA) <= EDGE_GRAB_PX) return "a";
-      if (Math.abs(px - xB) <= EDGE_GRAB_PX) return "b";
-      return null;
-    };
-
-    // Inactive bound waveform: a plain click activates it (and plays from the
-    // clicked position). The pointer-drag machinery below stays disarmed.
     this.wrap.addEventListener("click", (e) => {
-      if (this.active || !this.hasContent) return;
-      this.onActivate?.(timeAtX(e.clientX));
-    });
-
-    this.wrap.addEventListener("pointerdown", (e) => {
-      if (!this.active || !this.engine.file || e.button !== 0) return;
-      const edge = edgeAt(e.clientX);
-      const lp = this.engine.loop;
-      if (edge && lp) {
-        mode = edge === "a" ? "resize-a" : "resize-b";
-        this.dragZone = { ...lp };
-      } else {
-        mode = "maybe-click";
-        downX = e.clientX;
-        downTime = timeAtX(e.clientX);
+      if (!this.hasContent) return;
+      const time = timeAtX(e.clientX);
+      if (!this.active) {
+        this.onActivate?.(time);
+        return;
       }
-      this.wrap.setPointerCapture(e.pointerId);
+      if (this.engine.file) void this.engine.playAt(time);
     });
 
-    this.wrap.addEventListener("pointermove", (e) => {
-      // with zones switched off a drag stays a click: no zone is born from a
-      // slip of the hand, which is what made them a nuisance rather than a tool
-      if (mode === "maybe-click" && this.plugin.settings.loopZones
-        && Math.abs(e.clientX - downX) > DRAG_THRESHOLD_PX) {
-        mode = "select";
-      }
-      if (mode === "select") {
-        const now = timeAtX(e.clientX);
-        this.dragZone = { a: Math.min(downTime, now), b: Math.max(downTime, now) };
-        this.markDirty();
-      } else if (mode === "resize-a" && this.dragZone) {
-        this.dragZone.a = Math.max(0, Math.min(timeAtX(e.clientX), this.dragZone.b - MIN_ZONE_SEC));
-        this.markDirty();
-      } else if (mode === "resize-b" && this.dragZone) {
-        this.dragZone.b = Math.max(timeAtX(e.clientX), this.dragZone.a + MIN_ZONE_SEC);
-        this.markDirty();
-      } else if (mode === "idle" && this.active) {
-        this.wrap.toggleClass("sw-wave-resize", edgeAt(e.clientX) !== null);
-      }
-      this.showHover(e);
-    });
-
-    this.wrap.addEventListener("pointerup", (e) => {
-      if (this.wrap.hasPointerCapture(e.pointerId)) this.wrap.releasePointerCapture(e.pointerId);
-      const dragged = mode === "select" || mode === "resize-a" || mode === "resize-b";
-      if (dragged && this.dragZone) {
-        this.engine.setLoopZone(this.dragZone.a, this.dragZone.b);
-      } else if (mode === "maybe-click") {
-        void this.engine.playAt(downTime);
-      }
-      mode = "idle";
-      this.dragZone = null;
-      this.markDirty();
-    });
-
-    this.wrap.addEventListener("pointercancel", () => {
-      mode = "idle";
-      this.dragZone = null;
-      this.markDirty();
-    });
-
+    this.wrap.addEventListener("pointermove", (e) => this.showHover(e));
     this.wrap.addEventListener("dblclick", (e) => {
       if (!this.active || !this.engine.file) return;
       this.engine.setMarkerAt(timeAtX(e.clientX));
@@ -413,20 +327,6 @@ export class WaveformRenderer {
       ctx.fillRect(x, mid - h, colW, h * 2);
     }
     ctx.globalAlpha = 1;
-
-    // A-B loop zone (saved, or being dragged right now)
-    const zone = this.dragZone ?? this.shownLoop;
-    if (zone && d > 0) {
-      const x1 = (zone.a / d) * W;
-      const x2 = (zone.b / d) * W;
-      ctx.fillStyle = this.colors.played;
-      ctx.globalAlpha = 0.16;
-      ctx.fillRect(x1, 0, x2 - x1, H);
-      ctx.globalAlpha = 0.7;
-      ctx.fillRect(Math.round(x1), 0, Math.max(1, dpr), H);
-      ctx.fillRect(Math.round(x2), 0, Math.max(1, dpr), H);
-      ctx.globalAlpha = 1;
-    }
 
     // marker flag
     const data = this.trackData();

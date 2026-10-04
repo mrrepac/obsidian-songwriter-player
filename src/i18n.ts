@@ -19,16 +19,13 @@ const en = {
   noTrack: "Songwriter: no track is loaded.",
   loadFailed: (name: string) => `Songwriter: could not load “${name}”.`,
   nextFromStart: "Next start plays from the beginning",
-  markerAndLoopCleared: "⚑ Marker and loop zone cleared",
-  markerCleared: "⚑ Marker cleared",
-  loopCleared: "Loop zone cleared",
   markerSet: (time: string) => `⚑ Marker: ${time}`,
   extOpenFailed: "Songwriter: could not open the file in an external app.",
   desktopOnly: "Songwriter: available on desktop only.",
   revealFailed: "Songwriter: could not reveal the file in the system explorer.",
   audioNotFound: "Songwriter: could not find the audio file.",
   noActiveNote: "Songwriter: no active note.",
-  dataUnreadable: "Songwriter: data.json could not be read, so your markers, loop zones and counters are not loaded. A copy has been kept as data.json.bak, and nothing will be written over the file until it is repaired or removed.",
+  dataUnreadable: "Songwriter: data.json could not be read, so your markers and counters are not loaded. A copy has been kept as data.json.bak, and nothing will be written over the file until it is repaired or removed.",
   noAudioInNote: "Songwriter: the note has no audio files.",
   trackNoteNotFound: "Songwriter: no note with this track was found.",
 
@@ -51,8 +48,6 @@ const en = {
   playsTitle: "Play count · total listened. Right-click — reset.",
   ejectTitle: "Unload track from the player",
   clearMarkerTitle: "Clear the marker",
-  setLoopZonesName: "A-B loop zone",
-  setLoopZonesDesc: "Off: dragging across the waveform no longer selects a looping fragment, saved zones are ignored, and a track with one plays through to the next instead of circling. Nothing is deleted — switching this back on brings the zones back.",
   pendingSwitchText: (name: string) => `Queued: ${name}`,
   switchBtn: "Switch",
   hideBtn: "Hide",
@@ -130,7 +125,7 @@ const en = {
     "Opening an audio file queues up every audio file next to it, so ⏮ ⏭ walk the folder. Off: the file is loaded alone.",
   setAutoAdvanceName: "Play the playlist through",
   setAutoAdvanceDesc:
-    "When a track ends, the next one in the playlist starts. The last track just stops. A track with an A-B zone keeps looping and never advances.",
+    "When a track ends, the next one in the playlist starts. The last track just stops.",
   headingMusical: "Tempo and key",
   setAutoAnalyseName: "Measure a track when it loads",
   setAutoAnalyseDesc:
@@ -157,7 +152,7 @@ const en = {
   setWaveHDesc: "Height of the visible waveform, in pixels.",
   setInlineName: "Waveform players in notes",
   setInlineDesc:
-    "Replace the plain embedded audio players in notes with a waveform wired to this player: click to play, drag for an A-B zone, double-click to set the marker. One track plays at a time, shared with the sidebar.",
+    "Replace the plain embedded audio players in notes with a waveform wired to this player: click to play, double-click to set the marker. One track plays at a time, shared with the sidebar.",
   setEmbedBtnName: "“Open externally” button",
   setEmbedBtnDesc:
     "Show an “open externally” button on audio players in notes (right-click reveals the file in the system explorer). Applies to both the waveform and the plain player.",
@@ -175,16 +170,13 @@ const ru: typeof en = {
   noTrack: "Songwriter: трек не загружен.",
   loadFailed: (name: string) => `Songwriter: не удалось загрузить «${name}».`,
   nextFromStart: "Следующий запуск — с начала трека",
-  markerAndLoopCleared: "⚑ Маркер и зона повтора удалены",
-  markerCleared: "⚑ Маркер удалён",
-  loopCleared: "Зона повтора удалена",
   markerSet: (time: string) => `⚑ Маркер: ${time}`,
   extOpenFailed: "Songwriter: не удалось открыть файл во внешнем приложении.",
   desktopOnly: "Songwriter: доступно только на компьютере.",
   revealFailed: "Songwriter: не удалось показать файл в проводнике.",
   audioNotFound: "Songwriter: не удалось найти аудиофайл.",
   noActiveNote: "Songwriter: нет активной заметки.",
-  dataUnreadable: "Songwriter: не удалось прочитать data.json, поэтому маркеры, зоны повтора и счётчики не загружены. Копия сохранена как data.json.bak, и файл не будет перезаписан, пока вы его не почините или не удалите.",
+  dataUnreadable: "Songwriter: не удалось прочитать data.json, поэтому маркеры и счётчики не загружены. Копия сохранена как data.json.bak, и файл не будет перезаписан, пока вы его не почините или не удалите.",
   noAudioInNote: "Songwriter: в заметке нет аудиофайлов.",
   trackNoteNotFound: "Songwriter: заметка с этим треком не найдена.",
 
@@ -205,8 +197,6 @@ const ru: typeof en = {
   playsTitle: "Проигрываний · наиграно всего. Правый клик — сброс.",
   ejectTitle: "Выгрузить трек из плеера",
   clearMarkerTitle: "Снять маркер",
-  setLoopZonesName: "Зона повтора A-B",
-  setLoopZonesDesc: "Выключено: протяжка по волне больше не выделяет зацикленный фрагмент, сохранённые зоны не применяются, и трек с зоной играет дальше по списку, а не крутится. Ничего не удаляется — включите обратно, и зоны вернутся.",
   pendingSwitchText: (name: string) => `На очереди: ${name}`,
   switchBtn: "Переключить",
   hideBtn: "Скрыть",
@@ -280,7 +270,7 @@ const ru: typeof en = {
     "При открытии аудиофайла в очередь встают все аудиофайлы рядом с ним, и кнопки ⏮ ⏭ ходят по папке. Выключено — файл грузится в одиночку.",
   setAutoAdvanceName: "Играть плейлист подряд",
   setAutoAdvanceDesc:
-    "Когда трек доиграл, включается следующий из плейлиста. После последнего плеер просто останавливается. Трек с зоной A-B продолжает крутиться и никуда не переключается.",
+    "Когда трек доиграл, включается следующий из плейлиста. После последнего плеер просто останавливается.",
   headingMusical: "Темп и тональность",
   setAutoAnalyseName: "Измерять трек при загрузке",
   setAutoAnalyseDesc:
@@ -307,7 +297,7 @@ const ru: typeof en = {
   setWaveHDesc: "Высота видимой волны трека в пикселях.",
   setInlineName: "Волна вместо плеера в заметках",
   setInlineDesc:
-    "Заменять штатные встроенные аудиоплееры в заметках волной, привязанной к этому плееру: клик — играть, протяжка — зона A-B, двойной клик — маркер. Играет одна дорожка за раз, общая с панелью.",
+    "Заменять штатные встроенные аудиоплееры в заметках волной, привязанной к этому плееру: клик — играть, двойной клик — маркер. Играет одна дорожка за раз, общая с панелью.",
   setEmbedBtnName: "Кнопка «открыть внешне»",
   setEmbedBtnDesc:
     "Показывать кнопку «открыть внешне» у аудиоплееров в заметках (правый клик — показать файл в проводнике). Работает и для волны, и для штатного плеера.",

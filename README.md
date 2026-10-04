@@ -17,31 +17,19 @@ not in the UI).
   to switch with a small banner instead of interrupting. The mode is configurable:
   hybrid / always / manual.
 - **Track waveform**:
-  - single click — play from there (a click outside the loop zone clears the zone);
-  - double click — set the marker;
-  - press and drag — select an A-B zone;
-  - drag a zone edge — move it (the cursor turns into ↔).
+  - single click — play from there;
+  - double click — set the marker.
 - **Marker (⚑)** — one point per track: mark the spot you keep coming back to while
   working on a song. "Play from marker" always starts there (with no marker — from the
   start). The marker is remembered per file, and the ⚑ button in the track row drops
   it again — it appears only while there is one to drop.
-- **A-B loop zone** — a selected fragment of the waveform plays in a loop; the zone
-  start automatically becomes the marker, so "Play from marker" restarts the loop from
-  its beginning. Seeking outside the zone by hand does not drag you back — the loop
-  only kicks in when playback itself reaches the B edge. The zone is remembered per
-  file; clear it by clicking outside it or with the Clear A-B loop zone command (the
-  marker stays). If zones only get in your way, switch them off in settings: a drag
-  across the waveform stops selecting one, saved zones are ignored, and a track that
-  has one plays through to the next instead of circling. Nothing is deleted — turning
-  the setting back on brings the zones back.
 - **Playlist** — open a note holding several audio files and they line up as its
   playlist; open an audio file and every audio file next to it in the folder does.
   The list sits under the player (collapsible, remembers its state): the current
   track is highlighted, each row shows its play count and a ⚑ if the track has a
   marker, a click switches to it — and keeps playing if something was playing.
   `⏮ ⏭` walk the list, and the list survives ejecting the track, so you can pick
-  the next one from it. Optionally the playlist plays through on its own; a track
-  with an A-B zone keeps looping instead.
+  the next one from it. Optionally the playlist plays through on its own.
 - **Drag a track out** — drag a row (or the loaded track's name) into a note and
   it drops in as a link; hold `Alt` while dragging and the file itself goes out
   instead — to the system file explorer, the desktop, or an audio editor such as
@@ -56,13 +44,13 @@ not in the UI).
 - **Copy a track into the note you are looking at** — the `Copy track to current
   note` command, or the same item in a playlist row's right-click menu. The copy
   lands in the vault's own attachment folder and is embedded in the note as a
-  waveform; the track's marker, loop zone, counters and measured tempo and key
+  waveform; the track's marker, counters and measured tempo and key
   come with it. Playback is not interrupted — filing is not listening. Sending
   the same track again links the copy that is already there instead of making a
   twin.
 - **Play count and total listened time** — next to the track name (`▶ 27 · 2h40m`).
   A run only counts once 5 seconds have actually sounded (start-and-stop does not
-  count; pause-and-resume keeps accumulating). Every loop-zone pass is a new run.
+  count; pause-and-resume keeps accumulating).
   Listened time accumulates only while sound is actually playing. Right-click the
   counter to reset both.
 - **Back to the track's note** — click the track name (or `Alt+D`) to jump to the
@@ -80,8 +68,8 @@ not in the UI).
   app`, `Reveal track in system explorer`. The embedded-player buttons can be turned
   off in settings.
 
-The marker and the zone are visible right on the waveform (an orange flag and a
-highlighted fragment) — there are no separate indicators in the panel. Time, buttons
+The marker is visible right on the waveform (an orange flag) — there are no
+separate indicators in the panel. Time, buttons
 and volume share a single line under the waveform.
 
 ## Hotkeys (defaults)
@@ -92,7 +80,7 @@ duplicated out of the box.
 | Command | Keys |
 | --- | --- |
 | Play from marker (or from start) | `Alt+X` |
-| Stop (double press: the next `Alt+X` plays from the start, marker intact; triple: the marker and the zone are deleted) | `Alt+C` |
+| Stop (double press: the next `Alt+X` plays from the start, marker intact) | `Alt+C` |
 | Set marker at current position | `Alt+Z` |
 | Play/Pause | `Alt+P` |
 | Open track's note | `Alt+D` |
@@ -105,7 +93,7 @@ duplicated out of the box.
 **On the numeric keypad** the four of them sit together, under one hand:
 `Alt+÷` / `Alt+×` transpose down and up, `Alt+−` / `Alt++` step the tempo.
 
-Without default keys: Clear marker, Clear A-B loop zone, Load audio from current
+Without default keys: Clear marker, Load audio from current
 note, Open player panel, Unload track, Copy track to current note, Open track in
 default app, Reveal track in system explorer.
 
@@ -118,7 +106,7 @@ embedded-player button.
 
 ## Data
 
-Markers, loop zones and counters are stored in the plugin's `data.json`, keyed by the
+Markers and counters are stored in the plugin's `data.json`, keyed by the
 audio file path; when a file is renamed inside the vault, its data moves along
 automatically.
 

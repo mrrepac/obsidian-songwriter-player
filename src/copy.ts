@@ -78,7 +78,7 @@ export async function copyTrackToNote(
       return;
     }
 
-    // the copy inherits marker, loop, counters and measurements: without them
+    // the copy inherits marker, counters and measurements: without them
     // it is a stranger to the plugin and gets analysed all over again
     const data = plugin.settings.tracks[file.path];
     if (data && !plugin.settings.tracks[copy.path]) {

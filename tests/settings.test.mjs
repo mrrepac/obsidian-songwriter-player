@@ -13,7 +13,7 @@
  */
 import { browserGlobals, bundle, load, obsidianStub, suite } from "./harness.mjs";
 
-const track = (extra) => ({ marker: null, loopA: null, loopB: null, plays: 0, playedSec: 0, ...extra });
+const track = (extra) => ({ marker: null, plays: 0, playedSec: 0, ...extra });
 
 export default async function run() {
   const s = suite("settings — what survives a restart");
@@ -154,6 +154,23 @@ export default async function run() {
       () => saved.beatGrid === undefined && saved.snapToBeats === undefined && saved.snapBars === undefined);
     s.check("nor is a grid ever stored on a track",
       () => saved.tracks["measured.mp3"].beatOffset === undefined);
+  }
+
+  // ---- the A-B zone was taken out in 1.9.0 ----
+  // A zone's start doubled as the marker, so the marker is what carries on.
+  {
+    const { saved } = await roundTrip({
+      loopZones: false,
+      tracks: {
+        "zoned.mp3": { marker: 4, loopA: 4, loopB: 12, plays: 3, playedSec: 60 },
+        "zone-only.mp3": { marker: null, loopA: 1, loopB: 2, plays: 0, playedSec: 0 }
+      }
+    });
+    s.check("a saved zone is not written back", () => saved.tracks["zoned.mp3"].loopA === undefined
+      && saved.tracks["zoned.mp3"].loopB === undefined);
+    s.check("its marker stays", () => saved.tracks["zoned.mp3"].marker === 4);
+    s.check("a record that held only a zone is pruned", () => saved.tracks["zone-only.mp3"] === undefined);
+    s.check("and so is the switch that gated zones", () => saved.loopZones === undefined);
   }
 
   // ---- keys this version does not know ----

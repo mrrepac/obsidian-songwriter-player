@@ -200,7 +200,7 @@ body.sw-hide-embed-buttons .sw-ext-btn {
 }
 
 /* reuses the sidebar .sw-wave visuals, but shorter, and lets vertical page
-   scroll pass through — only horizontal drags select an A-B zone */
+   scroll pass through */
 .sw-embed-wave .sw-wave {
   height: var(--sw-embed-wave-height, 56px);
   border-radius: var(--radius-s);
@@ -210,10 +210,6 @@ body.sw-hide-embed-buttons .sw-ext-btn {
 
 .sw-embed.is-active .sw-embed-wave .sw-wave {
   cursor: crosshair;
-}
-
-.sw-embed.is-active .sw-embed-wave .sw-wave.sw-wave-resize {
-  cursor: ew-resize;
 }
 
 .sw-embed-play {
@@ -321,10 +317,6 @@ body.sw-hide-embed-buttons .sw-embed-ext {
   overflow: hidden;
   cursor: crosshair;
   touch-action: none;
-}
-
-.sw-wave.sw-wave-resize {
-  cursor: ew-resize;
 }
 
 .sw-wave-canvas {

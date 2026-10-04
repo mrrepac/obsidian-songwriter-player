@@ -6,7 +6,7 @@ import { createPitchShifter, ensurePitchWorklet, pitchLatency, semitonesToRatio 
 /**
  * Bakes the transposition (and the speed, if it is off) into a new audio file
  * next to the original: "beat-tone+2bpm134.wav". The copy is an ordinary file,
- * so it plays with everything the plugin has — marker, A-B zone, waveform,
+ * so it plays with everything the plugin has — marker, counters, waveform,
  * playlist, dragging into a note — and it can be handed to a DAW as is.
  */
 

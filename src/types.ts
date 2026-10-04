@@ -2,8 +2,6 @@ import { t } from "./i18n";
 
 export interface TrackData {
   marker: number | null;
-  loopA: number | null;
-  loopB: number | null;
   plays: number;
   playedSec: number;
   /** measured tempo, rounded; null until the track has been analysed */
@@ -27,8 +25,6 @@ export interface TrackData {
 export function emptyTrackData(): TrackData {
   return {
     marker: null,
-    loopA: null,
-    loopB: null,
     plays: 0,
     playedSec: 0
   };
@@ -65,8 +61,6 @@ export interface SongwriterSettings {
   mediaKeys: boolean;
   /** register the built-in single-Alt hotkeys; off leaves every command bare */
   defaultHotkeys: boolean;
-  /** off: no zone is drawn, a drag cannot create one, and nothing loops */
-  loopZones: boolean;
   folderQueue: boolean;
   autoAdvance: boolean;
   playlistCollapsed: boolean;
@@ -94,7 +88,6 @@ export const DEFAULT_SETTINGS: SongwriterSettings = {
   // off for a fresh install; loadSettings turns it on for a vault upgrading
   // from a version where these keys were baked into the commands
   defaultHotkeys: false,
-  loopZones: true,
   folderQueue: true,
   autoAdvance: false,
   playlistCollapsed: false,

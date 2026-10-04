@@ -38,25 +38,14 @@ export class PlayerEngine extends Events {
     (this.audio as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
     this.audio.volume = plugin.settings.volume;
     this.audio.addEventListener("play", () => {
-      this.updateLoopTimer();
       this.trigger("play-state", true);
     });
     this.audio.addEventListener("pause", () => {
-      this.updateLoopTimer();
       this.plugin.requestSave(); // flush accumulated listened time
       this.trigger("play-state", false);
     });
     this.audio.addEventListener("ended", () => {
-      // loop stretching to the very end: restart from A instead of stopping
-      const lp = this.loop;
-      if (lp) {
-        this.audio.currentTime = lp.a;
-        if (this.pendingPlaySec === null) this.armPlayCount();
-        void this.safePlay();
-        return;
-      }
       this.pendingPlaySec = null; // an under-5s tail never scores
-      this.updateLoopTimer();
       this.trigger("play-state", false);
       // the playlist rolls on only if asked to, and only for a track that is
       // actually in it; the last track just stops
@@ -64,9 +53,9 @@ export class PlayerEngine extends Events {
         void this.step(1, { autoplay: true });
       }
     });
-    this.audio.addEventListener("timeupdate", this.checkLoop);
+    this.audio.addEventListener("timeupdate", this.trackPlayback);
     this.audio.addEventListener("seeked", () => {
-      this.lastLoopTime = this.audio.currentTime;
+      this.lastTime = this.audio.currentTime;
     });
     this.audio.addEventListener("error", () => {
       if (this.file && this.audio.error) {
@@ -105,8 +94,8 @@ export class PlayerEngine extends Events {
   // ---- play counter ----
   // Counts "passes", but a pass only scores after settings.playCountSec
   // seconds of actual playback: starting (X / waveform click) arms the
-  // countdown, checkLoop accumulates played time, and the increment fires at
-  // zero. A loop wrap arms the next lap; shorter passes never score.
+  // countdown, trackPlayback accumulates played time, and the increment fires
+  // at zero. Shorter passes never score.
 
   private pendingPlaySec: number | null = null;
 
@@ -168,8 +157,7 @@ export class PlayerEngine extends Events {
       ? (this.peekData()?.marker ?? 0)
       : 0;
     if (start > 0 && start < this.duration) this.audio.currentTime = start;
-    this.lastLoopTime = this.audio.currentTime;
-    this.updateLoopTimer();
+    this.lastTime = this.audio.currentTime;
     this.trigger("track-changed", file);
     if (opts.autoplay) await this.safePlay();
   }
@@ -210,9 +198,7 @@ export class PlayerEngine extends Events {
     this.file = null;
     this.playFromStartOnce = false;
     this.pendingPlaySec = null;
-    this.stopChain = 0;
     this.setPendingSwitch(null);
-    this.updateLoopTimer();
     this.plugin.requestSave(); // flush listened time (the pause event is async)
     this.trigger("track-changed", null);
   }
@@ -266,52 +252,32 @@ export class PlayerEngine extends Events {
     await this.safePlay();
   }
 
-  /** Single click on the waveform: play from there; a click outside the loop zone clears it. */
+  /** Single click on the waveform: play from there. */
   async playAt(time: number) {
     if (!this.file) return;
-    const lp = this.loop;
-    if (lp && (time < lp.a || time > lp.b)) this.clearLoop();
     this.seekTo(time);
     this.armPlayCount();
     await this.safePlay();
   }
 
   /**
-   * Stop, with escalation on repeated presses (each within the window from
-   * the previous one): 2nd — rewind to 0 and arm a one-shot "next Play from
-   * marker starts from the beginning" (marker and zone untouched);
-   * 3rd — the marker is deleted too.
+   * Stop. A second press within the window from the first rewinds to 0 and
+   * arms a one-shot "next Play from marker starts from the beginning"; the
+   * marker itself is untouched. (A third press used to delete the marker and
+   * the A-B zone; the zone is gone, and the marker has its own button.)
    */
   private lastStopAt = 0;
-  private stopChain = 0;
   private playFromStartOnce = false;
 
   stop() {
     const now = Date.now();
     const within = !!this.file && now - this.lastStopAt < this.plugin.settings.doubleStopMs;
     this.lastStopAt = now;
-    if (!within) {
-      this.stopChain = 1;
-      this.audio.pause();
-      return;
-    }
-    this.stopChain++;
-    if (this.stopChain === 2) {
-      this.audio.pause();
-      this.seekTo(0);
-      this.playFromStartOnce = true;
-      new Notice(t("nextFromStart"), 1500);
-    } else if (this.stopChain >= 3) {
-      this.stopChain = 0;
-      const d = this.peekData();
-      const hadMarker = d?.marker !== null && d?.marker !== undefined;
-      const hadLoop = !!this.loop;
-      this.clearMarker();
-      this.clearLoop();
-      if (hadMarker && hadLoop) new Notice(t("markerAndLoopCleared"), 1500);
-      else if (hadMarker) new Notice(t("markerCleared"), 1500);
-      else if (hadLoop) new Notice(t("loopCleared"), 1500);
-    }
+    this.audio.pause();
+    if (!within) return;
+    this.seekTo(0);
+    this.playFromStartOnce = true;
+    new Notice(t("nextFromStart"), 1500);
   }
 
   setVolume(volume: number) {
@@ -362,8 +328,8 @@ export class PlayerEngine extends Events {
   // ---- transposition (desktop only) ----
   //
   // The shifter is inserted between the element and the speakers, so the
-  // element stays the source of truth for time: seeking, the A-B zone, the
-  // counters and the playhead keep working untouched. The graph is built only
+  // element stays the source of truth for time: seeking, the counters and the
+  // playhead keep working untouched. The graph is built only
   // when a shift is actually asked for — until then the audio path is exactly
   // what it was, and routing an element through Web Audio (flaky on mobile
   // WebViews) never happens there at all.
@@ -460,59 +426,19 @@ export class PlayerEngine extends Events {
     this.dataChanged();
   }
 
-  // ---- A-B loop zone ----
-
-  get loop(): { a: number; b: number } | null {
-    // one gate for the whole feature: with zones switched off nothing loops and
-    // nothing is drawn, so the playlist plays through instead of circling. A
-    // zone saved earlier stays in the file, waiting to be switched back on
-    // rather than quietly deleted.
-    if (!this.plugin.settings.loopZones) return null;
-    const d = this.peekData();
-    if (!d || d.loopA === null || d.loopB === null) return null;
-    return { a: d.loopA, b: d.loopB };
-  }
-
-  setLoopZone(a: number, b: number) {
-    const d = this.ensureData();
-    if (!d) return;
-    if (b - a < 0.2) return; // too small to be a real selection
-    d.loopA = a;
-    d.loopB = b;
-    d.marker = a; // zone start doubles as the marker, so Play from marker replays the zone
-    this.playFromStartOnce = false;
-    this.dataChanged();
-    const t = this.audio.currentTime;
-    if (t < a || t >= b) this.seekTo(a);
-    this.updateLoopTimer();
-  }
-
-  clearLoop() {
-    const d = this.peekData();
-    if (!d || (d.loopA === null && d.loopB === null)) return;
-    d.loopA = null;
-    d.loopB = null;
-    this.dataChanged();
-    this.updateLoopTimer();
-  }
-
   /**
-   * Wrap back to A only when playback itself crossed B (lastLoopTime tracks
-   * the previous tick; "seeked" resets it), so seeking past the zone by hand
-   * does not teleport the user back in.
+   * Real listening time, from the element's own clock: it feeds both the
+   * listened-time counter and the pending play count. lastTime tracks the
+   * previous tick, and "seeked" resets it, so a jump never counts as time.
    */
-  private lastLoopTime = 0;
-  private loopInterval: number | null = null;
-
+  private lastTime = 0;
   private unsavedPlayedSec = 0;
 
-  private checkLoop = () => {
-    const lp = this.loop;
+  private trackPlayback = () => {
     const t = this.audio.currentTime;
-    // accumulate real playback time (delta guard skips seeks and stalls):
-    // it feeds both the total listened counter and the pending play count
     if (this.playing) {
-      const delta = t - this.lastLoopTime;
+      const delta = t - this.lastTime;
+      // the delta guard skips seeks and stalls
       if (delta > 0 && delta < 2) {
         // currentTime advances at playbackRate, so convert back to real
         // seconds: an hour spent practising at 0.5× is an hour of listening,
@@ -538,25 +464,8 @@ export class PlayerEngine extends Events {
         }
       }
     }
-    if (lp && this.playing && this.lastLoopTime < lp.b && t >= lp.b) {
-      this.audio.currentTime = lp.a;
-      this.lastLoopTime = lp.a;
-      if (this.pendingPlaySec === null) this.armPlayCount(); // next lap = new pass
-      return;
-    }
-    this.lastLoopTime = t;
+    this.lastTime = t;
   };
-
-  /** timeupdate fires only ~4 times/sec; a 60ms interval keeps the loop edge tight. */
-  updateLoopTimer() {
-    const need = !!this.loop && this.playing;
-    if (need && this.loopInterval === null) {
-      this.loopInterval = window.setInterval(this.checkLoop, 60);
-    } else if (!need && this.loopInterval !== null) {
-      window.clearInterval(this.loopInterval);
-      this.loopInterval = null;
-    }
-  }
 
   // ---- playlist ----
 
@@ -618,10 +527,6 @@ export class PlayerEngine extends Events {
   }
 
   destroy() {
-    if (this.loopInterval !== null) {
-      window.clearInterval(this.loopInterval);
-      this.loopInterval = null;
-    }
     if (this.audioCtx) {
       void this.audioCtx.close();
       this.audioCtx = null;

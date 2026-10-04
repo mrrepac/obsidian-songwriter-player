@@ -7,8 +7,8 @@
  *
  *     <audio> → MediaElementSource → PitchShifter → destination
  *
- * Nothing else in the engine has to change: currentTime, seeking, the A-B
- * zone, the counters and the waveform playhead all still read the element.
+ * Nothing else in the engine has to change: currentTime, seeking, the
+ * marker, the counters and the waveform playhead all still read the element.
  *
  * The DSP is granular: grains of `GRAIN` output samples are read from the
  * input at `ratio` speed (so their content is transposed) and stitched at
