@@ -199,13 +199,20 @@ function convNext(weights: Weights, i: number, a: Act): Act {
     for (let r = 0; r < H; r++) {
       for (let q = 0; q < W; q++) {
         let s = dwBias[c];
+        const inside = q >= half && q < W - half;
         for (let u = 0; u < k; u++) {
           const rr = Math.min(H - 1, Math.max(0, r + u - half));
           const row = (c * H + rr) * W;
           const wk = (c * k + u) * k;
-          for (let v = 0; v < k; v++) {
-            const qq = Math.min(W - 1, Math.max(0, q + v - half));
-            s += dw.data[wk + v] * a.data[row + qq];
+          if (inside) {
+            // away from the time edges no column needs clamping
+            const base = row + q - half;
+            for (let v = 0; v < k; v++) s += dw.data[wk + v] * a.data[base + v];
+          } else {
+            for (let v = 0; v < k; v++) {
+              const qq = Math.min(W - 1, Math.max(0, q + v - half));
+              s += dw.data[wk + v] * a.data[row + qq];
+            }
           }
         }
         conv[(c * H + r) * W + q] = s;
@@ -219,21 +226,35 @@ function convNext(weights: Weights, i: number, a: Act): Act {
   const b2 = weights.get(`${p}.pwconv2.bias`).data;
   const gamma = weights.get(`${p}.gamma`).data;
   const hidden = 4 * C;
-  const inVec = new Float64Array(C);
-  const mid = new Float64Array(hidden);
   const out = new Float32Array(a.data.length);
   const plane = H * W;
-  for (let pos = 0; pos < plane; pos++) {
-    for (let c = 0; c < C; c++) inVec[c] = normed[c * plane + pos];
+  // the two linear layers run over chunks of positions with the position as
+  // the inner loop: long, contiguous loops are what the JIT makes fast
+  const CHUNK = 4096;
+  const mid = new Float64Array(hidden * CHUNK);
+  const acc = new Float64Array(CHUNK);
+  for (let start = 0; start < plane; start += CHUNK) {
+    const n = Math.min(CHUNK, plane - start);
     for (let j = 0; j < hidden; j++) {
-      let s = b1[j];
-      for (let c = 0; c < C; c++) s += w1[j * C + c] * inVec[c];
-      mid[j] = gelu(s);
+      const row = j * CHUNK;
+      mid.fill(b1[j], row, row + n);
+      for (let c = 0; c < C; c++) {
+        const wv = w1[j * C + c];
+        const src = c * plane + start;
+        for (let p = 0; p < n; p++) mid[row + p] += wv * normed[src + p];
+      }
+      for (let p = 0; p < n; p++) mid[row + p] = gelu(mid[row + p]);
     }
     for (let c = 0; c < C; c++) {
-      let s = b2[c];
-      for (let j = 0; j < hidden; j++) s += w2[c * hidden + j] * mid[j];
-      out[c * plane + pos] = a.data[c * plane + pos] + gamma[c] * s;
+      acc.fill(b2[c], 0, n);
+      for (let j = 0; j < hidden; j++) {
+        const wv = w2[c * hidden + j];
+        const row = j * CHUNK;
+        for (let p = 0; p < n; p++) acc[p] += wv * mid[row + p];
+      }
+      const dst = c * plane + start;
+      const g = gamma[c];
+      for (let p = 0; p < n; p++) out[dst + p] = a.data[dst + p] + g * acc[p];
     }
   }
   return { ...a, data: out };

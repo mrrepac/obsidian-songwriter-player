@@ -21,8 +21,8 @@ export default async function run() {
   s.check("no require at all in the bundle", () => !/\brequire\(/.test(code));
   s.check("no WebAssembly left in the bundle", () => !/WebAssembly\./.test(code));
 
-  let result = null;
-  const self = { postMessage: (m) => { result = m; }, location: { href: "blob:app://obsidian.md/worker" } };
+  const results = [];
+  const self = { postMessage: (m) => { results.push(m); }, location: { href: "blob:app://obsidian.md/worker" } };
   const ctx = vm.createContext({
     self, location: self.location, importScripts() {},
     process, require: createRequire(import.meta.url), Buffer, __filename: "worker.js", __dirname: ".",
@@ -33,16 +33,18 @@ export default async function run() {
   let loadError = "";
   try {
     vm.runInContext(code, ctx);
-    self.onmessage({ data: { id: 1, tempoSamples: drumLoop(97, 11025), keySamples: chords(22050) } });
+    self.onmessage({ data: { id: 1, kind: "tempo", samples: drumLoop(97, 11025) } });
+    self.onmessage({ data: { id: 2, kind: "key", samples: chords(22050) } });
   } catch (e) {
     loadError = String(e?.message ?? e);
   }
 
-  s.check("the worker loads and answers", () => !loadError && result !== null, loadError);
-  s.check("the analysis succeeds", () => result.ok === true, result?.error ?? "");
-  s.check("a 97 bpm beat measures 97", () => Math.abs(result.bpm - 97) < 0.1, `got ${result?.bpm}`);
-  s.check("D minor chords read as D minor", () => result.key === "D" && result.scale === "minor",
-    `got ${result?.key} ${result?.scale}`);
+  const [tempo, key] = results;
+  s.check("the worker loads and answers both kinds", () => !loadError && results.length === 2, loadError);
+  s.check("both analyses succeed", () => tempo.ok && key.ok, tempo?.error ?? key?.error ?? "");
+  s.check("a 97 bpm beat measures 97", () => Math.abs(tempo.bpm - 97) < 0.1, `got ${tempo?.bpm}`);
+  s.check("D minor chords read as D minor", () => key.key === "D" && key.scale === "minor",
+    `got ${key?.key} ${key?.scale}`);
 
   return s.report();
 }

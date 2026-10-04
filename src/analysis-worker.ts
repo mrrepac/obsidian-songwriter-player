@@ -1,25 +1,24 @@
 /**
- * Tempo and key analysis, off the main thread.
+ * Tempo or key analysis, off the main thread.
  *
  * TempoCNN and S-KEY run for seconds on a full track — on the UI thread that
- * would freeze Obsidian, so everything here happens in a worker. This file is
- * bundled separately and inlined into main.js as a string (see
- * worker-build.mjs); the plugin starts it from a Blob URL, which is why it
- * imports only the detectors and their weights, nothing from the plugin.
+ * would freeze Obsidian, so everything here happens in a worker. The two are
+ * independent, so the plugin starts one worker for each and runs them side by
+ * side (see musical.ts). This file is bundled separately and inlined into
+ * main.js as a string (see worker-build.mjs); the plugin starts it from a
+ * Blob URL, which is why it imports only the detectors and their weights.
  */
 import tempoModel from "../models/tempocnn.bin";
 import keyModel from "../models/skey.bin";
-import { readWeights, Weights } from "./detect/weights";
+import { readWeights } from "./detect/weights";
 import { estimateTempo } from "./detect/tempo";
 import { estimateKey } from "./detect/key";
 
-export interface AnalyseRequest {
-  id: number;
+export type AnalyseRequest =
   /** mono at TEMPO_SR (11025 Hz) */
-  tempoSamples: Float32Array;
+  | { id: number; kind: "tempo"; samples: Float32Array }
   /** mono at KEY_SR (22050 Hz) */
-  keySamples: Float32Array;
-}
+  | { id: number; kind: "key"; samples: Float32Array };
 
 export interface AnalyseResponse {
   id: number;
@@ -36,27 +35,22 @@ export interface AnalyseResponse {
   keyStrength?: number;
 }
 
-let weights: { tempo: Weights; key: Weights } | null = null;
-
 self.onmessage = (e: MessageEvent<AnalyseRequest>) => {
-  const { id, tempoSamples, keySamples } = e.data;
+  const request = e.data;
+  let response: AnalyseResponse;
   try {
-    weights ??= { tempo: readWeights(tempoModel), key: readWeights(keyModel) };
-    const tempo = estimateTempo(weights.tempo, tempoSamples);
-    const key = estimateKey(weights.key, keySamples);
-    const response: AnalyseResponse = {
-      id,
-      ok: true,
-      bpm: tempo.bpm,
-      tempoConfidence: tempo.confidence,
-      key: key.key,
-      scale: key.scale,
-      scaleAlt: key.scaleAlt,
-      keyStrength: key.strength
-    };
-    (self as unknown as Worker).postMessage(response);
+    if (request.kind === "tempo") {
+      const tempo = estimateTempo(readWeights(tempoModel), request.samples);
+      response = { id: request.id, ok: true, bpm: tempo.bpm, tempoConfidence: tempo.confidence };
+    } else {
+      const key = estimateKey(readWeights(keyModel), request.samples);
+      response = {
+        id: request.id, ok: true,
+        key: key.key, scale: key.scale, scaleAlt: key.scaleAlt, keyStrength: key.strength
+      };
+    }
   } catch (err) {
-    const response: AnalyseResponse = { id, ok: false, error: String(err) };
-    (self as unknown as Worker).postMessage(response);
+    response = { id: request.id, ok: false, error: String(err) };
   }
+  (self as unknown as Worker).postMessage(response);
 };

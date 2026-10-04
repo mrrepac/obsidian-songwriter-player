@@ -1,5 +1,5 @@
 import { App, TFile } from "obsidian";
-import type { AnalyseResponse } from "./analysis-worker";
+import type { AnalyseRequest, AnalyseResponse } from "./analysis-worker";
 import { TEMPO_SR } from "./detect/tempo";
 import { KEY_SR } from "./detect/key";
 
@@ -59,6 +59,20 @@ function ensureWorker(): Worker {
 
 let nextId = 1;
 
+/** One measurement in its own worker; the worker is gone when it answers. */
+async function runInWorker(request: AnalyseRequest): Promise<AnalyseResponse> {
+  const worker = ensureWorker();
+  try {
+    return await new Promise<AnalyseResponse>((resolve, reject) => {
+      worker.onmessage = (e: MessageEvent<AnalyseResponse>) => resolve(e.data);
+      worker.onerror = (e) => reject(new Error(e.message || "analysis worker failed"));
+      worker.postMessage(request, [request.samples.buffer]);
+    });
+  } finally {
+    worker.terminate();
+  }
+}
+
 /**
  * Mono at the rate a network was trained on. The browser's decoder resamples
  * to the context's rate; the networks have no sample-rate parameter, so a
@@ -82,26 +96,20 @@ export async function analyseMusical(app: App, file: TFile, tempoWindowLow: numb
   const tempoSamples = await decodeMono(raw, TEMPO_SR);
   const keySamples = await decodeMono(raw, KEY_SR);
 
-  const worker = ensureWorker();
-  const id = nextId++;
-  try {
-    const result = await new Promise<AnalyseResponse>((resolve, reject) => {
-      worker.onmessage = (e: MessageEvent<AnalyseResponse>) => resolve(e.data);
-      worker.onerror = (e) => reject(new Error(e.message || "analysis worker failed"));
-      worker.postMessage({ id, tempoSamples, keySamples }, [tempoSamples.buffer, keySamples.buffer]);
-    });
-    if (!result.ok || result.bpm === undefined || !result.key || !result.scale) {
-      console.warn("Songwriter: analysis failed", result.error);
-      return null;
-    }
-    return {
-      bpm: resolveTempo(result.bpm, tempoWindowLow),
-      key: result.key,
-      scale: result.scale,
-      scaleAlt: result.scaleAlt ?? null,
-      keyStrength: result.keyStrength ?? 0
-    };
-  } finally {
-    worker.terminate();
+  // independent measurements: side by side, the track takes as long as the slower one
+  const [tempo, key] = await Promise.all([
+    runInWorker({ id: nextId++, kind: "tempo", samples: tempoSamples }),
+    runInWorker({ id: nextId++, kind: "key", samples: keySamples })
+  ]);
+  if (!tempo.ok || tempo.bpm === undefined || !key.ok || !key.key || !key.scale) {
+    console.warn("Songwriter: analysis failed", tempo.error ?? key.error);
+    return null;
   }
+  return {
+    bpm: resolveTempo(tempo.bpm, tempoWindowLow),
+    key: key.key,
+    scale: key.scale,
+    scaleAlt: key.scaleAlt ?? null,
+    keyStrength: key.keyStrength ?? 0
+  };
 }
