@@ -995,8 +995,20 @@ export class SongwriterView extends ItemView {
       els.flag.removeAttribute("aria-label");
     }
     els.plays.setText(data?.plays ? `▶ ${data.plays}` : "");
-    const key = formatKey(data?.key, data?.scale);
-    els.musical.setText(data?.bpm != null ? (key ? `${data.bpm} ${key}` : String(data.bpm)) : "");
+    // the track being measured right now — by the batch button or by hand —
+    // is marked in the list, so a long batch shows where it is
+    const analysing = this.plugin.isAnalysing(path);
+    els.row.toggleClass("is-analysing", analysing);
+    if (analysing) {
+      // setIcon adds to what is there, so the old text has to go first
+      els.musical.empty();
+      setIcon(els.musical, "loader-2");
+      els.musical.setAttribute("aria-label", t("analysing"));
+    } else {
+      const key = formatKey(data?.key, data?.scale);
+      els.musical.setText(data?.bpm != null ? (key ? `${data.bpm} ${key}` : String(data.bpm)) : "");
+      els.musical.removeAttribute("aria-label");
+    }
 
     const verdict = data?.verdict;
     for (const v of VERDICTS) els.row.toggleClass(`is-${v}`, verdict === v);

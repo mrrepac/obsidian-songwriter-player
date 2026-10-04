@@ -665,7 +665,7 @@ export default class SongwriterPlugin extends Plugin {
     const batch = { stopped: false };
     this.batch = batch;
     this.engine.trigger("data-changed"); // the button turns into "stop"
-    const notice = new Notice(t("batchProgress")(0, todo.length), 0);
+    const notice = new Notice(t("batchProgress")(0, todo.length, ""), 0);
     let measured = 0;
     let failed = 0;
     try {
@@ -673,7 +673,7 @@ export default class SongwriterPlugin extends Plugin {
         if (batch.stopped) break;
         // deleted or renamed away while the batch was running
         if (this.app.vault.getAbstractFileByPath(file.path) !== file) continue;
-        notice.setMessage(t("batchProgress")(i + 1, todo.length));
+        notice.setMessage(t("batchProgress")(i + 1, todo.length, file.basename));
         const outcome = await this.analyseTrack(file, false, true);
         if (outcome === "measured") measured++;
         else if (outcome === "failed") failed++;

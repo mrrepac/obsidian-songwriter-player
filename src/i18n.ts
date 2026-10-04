@@ -71,7 +71,8 @@ const en = {
   measureAllTitle: (n: number) => `Measure tempo and key of ${n} ${n === 1 ? "track" : "tracks"} not yet measured by the current detectors`,
   measureStopTitle: "Stop measuring after the current track",
   batchNothing: "Songwriter: every track in the playlist is already measured",
-  batchProgress: (i: number, n: number) => `Songwriter: measuring tempo and key — ${i} of ${n}`,
+  batchProgress: (i: number, n: number, name: string) =>
+    `Songwriter: measuring tempo and key — ${i} of ${n}${name ? ` · ${name}` : ""}`,
   batchDone: (measured: number, failed: number) =>
     `Songwriter: measured ${measured}` + (failed > 0 ? `, ${failed} could not be read` : ""),
   batchStopped: (measured: number, failed: number) =>
@@ -258,7 +259,8 @@ const ru: typeof en = {
   measureAllTitle: (n: number) => `Измерить темп и тональность у неизмеренных и измеренных старым способом: ${n}`,
   measureStopTitle: "Остановить замер после текущего трека",
   batchNothing: "Songwriter: все треки плейлиста уже измерены",
-  batchProgress: (i: number, n: number) => `Songwriter: измеряю темп и тональность — ${i} из ${n}`,
+  batchProgress: (i: number, n: number, name: string) =>
+    `Songwriter: измеряю темп и тональность — ${i} из ${n}${name ? ` · ${name}` : ""}`,
   batchDone: (measured: number, failed: number) =>
     `Songwriter: измерено ${measured}` + (failed > 0 ? `, не удалось прочитать ${failed}` : ""),
   batchStopped: (measured: number, failed: number) =>

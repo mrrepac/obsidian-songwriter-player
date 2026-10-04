@@ -116,6 +116,38 @@
   font-family: var(--font-monospace);
 }
 
+/* the track being measured right now */
+.sw-pl-row.is-analysing {
+  box-shadow: inset 2px 0 0 var(--interactive-accent);
+  background: var(--background-modifier-hover);
+}
+
+.sw-pl-row.is-analysing .sw-pl-name,
+.sw-pl-row.is-analysing .sw-pl-musical {
+  color: var(--text-accent);
+}
+
+.sw-pl-row.is-analysing .sw-pl-musical {
+  display: flex;
+  align-items: center;
+}
+
+.sw-pl-row.is-analysing .sw-pl-musical svg {
+  width: var(--icon-xs);
+  height: var(--icon-xs);
+  animation: sw-spin 1s linear infinite;
+}
+
+@keyframes sw-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sw-pl-row.is-analysing .sw-pl-musical svg {
+    animation: none;
+  }
+}
+
 .sw-plays {
   display: flex;
   align-items: center;
