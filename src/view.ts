@@ -3,7 +3,6 @@ import type SongwriterPlugin from "./main";
 import { PlayerEngine } from "./engine";
 import { EXT_BTN_TITLE, dragOutNatively, openExternally, revealInExplorer } from "./external";
 import { WaveformRenderer } from "./waveform";
-import { KEY_PROFILES } from "./musical";
 import { playTriad } from "./tone";
 import { transposeKey } from "./pitch";
 import { renderedName } from "./render";
@@ -515,9 +514,12 @@ export class SongwriterView extends ItemView {
     }
     const key = formatKey(d.key, d.scale);
     el.setText(key ? `${d.bpm} · ${key}` : String(d.bpm));
-    const votes = d.scaleAlt
-      ? t("votesSplit")(d.keyVotes ?? 0, KEY_PROFILES.length, formatKey(d.key, d.scaleAlt))
-      : t("votesUnanimous");
+    // tracks measured before 1.10.0 carry essentia's profile votes instead
+    const votes = d.keyStrength !== undefined
+      ? t("keyCertainty")(Math.round(d.keyStrength * 100), d.scaleAlt ? formatKey(d.key, d.scaleAlt) : null)
+      : d.scaleAlt
+        ? t("votesSplit")(d.keyVotes ?? 0, 5, formatKey(d.key, d.scaleAlt))
+        : t("votesUnanimous");
     el.title = t("musicalTitle")(votes, !!d.musicalEdited);
   }
 
@@ -540,7 +542,7 @@ export class SongwriterView extends ItemView {
       .onClick(() => this.plugin.editMusical(file.path, { bpm: Math.round(d.bpm! / 2) })));
 
     if (d.key) {
-      // the runner-up mode when the profiles split, the opposite one otherwise
+      // the runner-up mode when the detector was torn, the opposite one otherwise
       const alt = d.scaleAlt ?? (d.scale === "minor" ? "major" : "minor");
       const key = d.key;
       const label = (scale: string | null | undefined) =>

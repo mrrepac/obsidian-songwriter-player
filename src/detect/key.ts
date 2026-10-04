@@ -23,10 +23,15 @@ const KEY_NAMES = [
   "F minor", "F# minor", "G minor", "G# minor", "A minor", "Bb minor"
 ];
 
+/** Tracks measured before S-KEY carry essentia's flats; new ones match them. */
+const SPELLING: Record<string, string> = { "D#": "Eb", "G#": "Ab" };
+
 export interface KeyResult {
-  /** e.g. "C#" — spelled the way the rest of the plugin spells keys */
+  /** e.g. "C#" or "Eb" — spelled the way essentia spelled them before */
   key: string;
   scale: "major" | "minor";
+  /** the other mode of the same tonic when it is the runner-up, else null */
+  scaleAlt: "major" | "minor" | null;
   /** the winning class's probability */
   strength: number;
   probs: Float64Array;
@@ -288,6 +293,16 @@ export function estimateKey(weights: Weights, samples: Float32Array): KeyResult 
   const probs = chromaNet(weights, spec);
   let best = 0;
   for (let i = 1; i < 24; i++) if (probs[i] > probs[best]) best = i;
+  let second = best === 0 ? 1 : 0;
+  for (let i = 0; i < 24; i++) if (i !== best && probs[i] > probs[second]) second = i;
   const [tonic, scale] = KEY_NAMES[best].split(" ");
-  return { key: tonic, scale: scale as "major" | "minor", strength: probs[best], probs, vqtSum };
+  const [altTonic, altScale] = KEY_NAMES[second].split(" ");
+  return {
+    key: SPELLING[tonic] ?? tonic,
+    scale: scale as "major" | "minor",
+    scaleAlt: altTonic === tonic ? altScale as "major" | "minor" : null,
+    strength: probs[best],
+    probs,
+    vqtSum
+  };
 }

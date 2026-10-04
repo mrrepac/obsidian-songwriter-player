@@ -610,7 +610,8 @@ export default class SongwriterPlugin extends Plugin {
       d.key = result.key;
       d.scale = result.scale;
       d.scaleAlt = result.scaleAlt;
-      d.keyVotes = result.keyVotes;
+      d.keyStrength = result.keyStrength;
+      delete d.keyVotes;
       d.musicalEdited = false;
       this.requestSave();
       return "measured";
@@ -726,6 +727,7 @@ export default class SongwriterPlugin extends Plugin {
     d.scale = null;
     d.scaleAlt = null;
     d.keyVotes = undefined;
+    d.keyStrength = undefined;
     d.musicalEdited = false;
     this.requestSave();
     this.engine.trigger("data-changed");
@@ -942,6 +944,7 @@ export default class SongwriterPlugin extends Plugin {
         scale: raw.scale ?? null,
         scaleAlt: raw.scaleAlt ?? null,
         keyVotes: raw.keyVotes,
+        keyStrength: raw.keyStrength,
         musicalEdited: raw.musicalEdited,
         // speed and transposition are deliberately per track — a beat you are
         // learning stays slow, a song stays in the key you sing it in — so they

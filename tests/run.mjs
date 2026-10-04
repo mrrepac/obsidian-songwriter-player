@@ -11,8 +11,9 @@ import copy from "./copy.test.mjs";
 import playlist from "./playlist.test.mjs";
 import worker from "./worker.test.mjs";
 import stretch from "./stretch.test.mjs";
+import detect from "./detect.test.mjs";
 
-const suites = [settings, mediasession, hotkeys, pickup, copy, playlist, worker, stretch];
+const suites = [settings, mediasession, hotkeys, pickup, copy, playlist, worker, stretch, detect];
 
 let ok = true;
 for (const run of suites) {

@@ -2,62 +2,47 @@
  * The analysis worker, run the way Obsidian runs it.
  *
  * Obsidian's workers are web workers that also have Node: `process`, `require`
- * and `Buffer` are all there. essentia's Emscripten loader picks its branch by
- * looking for exactly those, so a worker that is fine in a browser can still
- * die inside Obsidian — a build after 1.8.0 did, on "path.dirname is not a
- * function", and nothing caught it until tracks stopped getting a tempo. This
- * builds the worker with the release's own build function, runs it in such an
- * environment, and measures a synthetic beat.
+ * and `Buffer` are all there. Under essentia that mattered — its loader took
+ * the Node branch and every analysis died inside Obsidian while passing in a
+ * browser. The detectors are plain JS now, but the environment is kept: this
+ * builds the worker with the release's own build function, runs it with the
+ * Node globals present, and measures a synthetic beat and a chord progression.
  */
 import vm from "node:vm";
 import { createRequire } from "node:module";
 import { buildWorker } from "../worker-build.mjs";
 import { suite } from "./harness.mjs";
-
-const SR = 44100;
-
-/** Ten seconds of a kick on every beat at `bpm`: a decaying 60 Hz thump. */
-function clickTrack(bpm, seconds = 10) {
-  const out = new Float32Array(SR * seconds);
-  const every = Math.round((SR * 60) / bpm);
-  for (let start = 0; start < out.length; start += every) {
-    for (let i = 0; i < SR * 0.12 && start + i < out.length; i++) {
-      out[start + i] = 0.8 * Math.sin((2 * Math.PI * 60 * i) / SR) * Math.exp(-i / (SR * 0.03));
-    }
-  }
-  return out;
-}
+import { drumLoop, chords } from "./signals.mjs";
 
 export default async function run() {
   const s = suite("analysis worker — as Obsidian runs it");
   const code = await buildWorker();
 
-  s.check("no bare require of fs in the bundle", () => !/require\(["']fs["']\)/.test(code));
+  s.check("no require at all in the bundle", () => !/\brequire\(/.test(code));
+  s.check("no WebAssembly left in the bundle", () => !/WebAssembly\./.test(code));
 
   let result = null;
   const self = { postMessage: (m) => { result = m; }, location: { href: "blob:app://obsidian.md/worker" } };
   const ctx = vm.createContext({
     self, location: self.location, importScripts() {},
-    // the Node half of an Obsidian worker — what sent the loader astray
     process, require: createRequire(import.meta.url), Buffer, __filename: "worker.js", __dirname: ".",
-    atob, console, WebAssembly, setTimeout, clearTimeout, TextDecoder, crypto: globalThis.crypto, performance
+    atob, console, setTimeout, clearTimeout, TextDecoder, performance
   });
   ctx.globalThis = ctx;
 
   let loadError = "";
   try {
     vm.runInContext(code, ctx);
-    await new Promise((r) => setTimeout(r, 1500)); // the wasm instantiates asynchronously
-    self.onmessage({ data: { id: 1, samples: clickTrack(120), sampleRate: SR, keyProfiles: ["edma"] } });
+    self.onmessage({ data: { id: 1, tempoSamples: drumLoop(97, 11025), keySamples: chords(22050) } });
   } catch (e) {
     loadError = String(e?.message ?? e);
   }
 
   s.check("the worker loads and answers", () => !loadError && result !== null, loadError);
   s.check("the analysis succeeds", () => result.ok === true, result?.error ?? "");
-  s.check("a 120 bpm beat measures 120", () => Math.abs(result.multifeature - 120) < 2,
-    `got ${result?.multifeature}`);
-  s.check("a key comes back", () => typeof result.keys?.[0]?.key === "string");
+  s.check("a 97 bpm beat measures 97", () => Math.abs(result.bpm - 97) < 0.1, `got ${result?.bpm}`);
+  s.check("D minor chords read as D minor", () => result.key === "D" && result.scale === "minor",
+    `got ${result?.key} ${result?.scale}`);
 
   return s.report();
 }

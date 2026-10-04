@@ -10,10 +10,13 @@ export interface TrackData {
   key?: string | null;
   /** "major" | "minor" */
   scale?: string | null;
-  /** the mode the profiles disagreed about, if they did */
+  /** the other mode of the same tonic, when the detector was torn between them */
   scaleAlt?: string | null;
-  /** how many key profiles backed the winner */
+  /** how many of essentia's five key profiles backed the winner — tracks
+   *  measured before 1.10.0 only; S-KEY writes keyStrength instead */
   keyVotes?: number;
+  /** S-KEY's probability for the winning key, 0…1 */
+  keyStrength?: number;
   /** hand-corrected: analysis must never overwrite it again */
   musicalEdited?: boolean;
   /** playback speed for this track, 1 = as recorded (pitch is preserved) */

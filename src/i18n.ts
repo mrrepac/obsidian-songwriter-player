@@ -114,6 +114,8 @@ const en = {
   musicalTitle: (votes: string, edited: boolean) =>
     edited ? `Tempo and key, corrected by hand · click for options` : `Tempo and key · ${votes} · click for options`,
   votesUnanimous: "all key profiles agree",
+  keyCertainty: (pct: number, alt: string | null) =>
+    alt ? `key ${pct}% sure, next guess ${alt}` : `key ${pct}% sure`,
   votesSplit: (n: number, total: number, alt: string) => `${n} of ${total} profiles, the rest say ${alt}`,
   menuDouble: "Tempo ×2",
   menuHalf: "Tempo ÷2",
@@ -298,6 +300,8 @@ const ru: typeof en = {
   musicalTitle: (votes: string, edited: boolean) =>
     edited ? "Темп и тональность, исправлены вручную · клик — меню" : `Темп и тональность · ${votes} · клик — меню`,
   votesUnanimous: "все профили согласны",
+  keyCertainty: (pct: number, alt: string | null) =>
+    alt ? `тональность: уверенность ${pct}%, следом ${alt}` : `тональность: уверенность ${pct}%`,
   votesSplit: (n: number, total: number, alt: string) => `${n} профиля из ${total}, остальные за ${alt}`,
   menuDouble: "Темп ×2",
   menuHalf: "Темп ÷2",
