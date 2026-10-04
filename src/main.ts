@@ -270,6 +270,19 @@ export default class SongwriterPlugin extends Plugin {
     });
 
     this.addCommand({
+      id: "analyse-playlist",
+      name: "Measure tempo and key of every track in the playlist",
+      callback: () => {
+        const queue = this.engine.queue;
+        if (queue.length === 0) {
+          new Notice(t("noTrack"));
+          return;
+        }
+        void this.analyseAll(queue);
+      }
+    });
+
+    this.addCommand({
       id: "next-track",
       name: "Next track in the playlist",
       hotkeys: this.keys("next-track"),
@@ -574,25 +587,24 @@ export default class SongwriterPlugin extends Plugin {
    * Measure tempo and key in a worker and remember them. Runs once per file:
    * a stored result, and any hand correction, is left alone unless forced.
    */
-  async analyseTrack(file: TFile, force = false): Promise<void> {
+  async analyseTrack(file: TFile, force = false, quiet = false): Promise<"measured" | "failed" | "skipped"> {
     const path = file.path;
-    if (this.analysing.has(path)) return;
-    const stored = this.settings.tracks[path];
-    if (!force && (stored?.musicalEdited || stored?.bpm != null)) return;
+    if (this.analysing.has(path)) return "skipped";
+    if (!force && this.isMeasured(path)) return "skipped";
 
     this.analysing.add(path);
     this.engine.trigger("data-changed"); // shows the pending state
     try {
       const result = await analyseMusical(this.app, file, this.settings.tempoWindowLow);
       if (!result) {
-        new Notice(t("analyseFailed")(file.basename));
-        return;
+        if (!quiet) new Notice(t("analyseFailed")(file.basename));
+        return "failed";
       }
       // the track may have been renamed or deleted while it was measured: a
       // TFile follows its renames, so its current path is the one to write to,
       // and a deleted one gets nothing — a record written under a dead path
       // carries a tempo, so the save-time pruning would never clear it
-      if (this.app.vault.getAbstractFileByPath(file.path) !== file) return;
+      if (this.app.vault.getAbstractFileByPath(file.path) !== file) return "skipped";
       const d = this.trackData(file.path);
       d.bpm = result.bpm;
       d.key = result.key;
@@ -601,13 +613,68 @@ export default class SongwriterPlugin extends Plugin {
       d.keyVotes = result.keyVotes;
       d.musicalEdited = false;
       this.requestSave();
+      return "measured";
     } catch (e) {
       console.warn("Songwriter: analysis failed", e);
-      new Notice(t("analyseFailed")(file.basename));
+      if (!quiet) new Notice(t("analyseFailed")(file.basename));
+      return "failed";
     } finally {
       this.analysing.delete(path);
       this.engine.trigger("data-changed");
     }
+  }
+
+  /** A stored tempo, or a hand correction, means there is nothing to measure. */
+  isMeasured(path: string): boolean {
+    const d = this.settings.tracks[path];
+    return !!d?.musicalEdited || d?.bpm != null;
+  }
+
+  /** The batch in flight, if any; its flag is how a second click stops it. */
+  private batch: { stopped: boolean } | null = null;
+
+  get measuringAll(): boolean {
+    return this.batch !== null;
+  }
+
+  /**
+   * Measure every track in the list that has no tempo yet — a freshly dropped
+   * pack of beats, typically. One at a time, on purpose: each measurement
+   * decodes a whole file, and running them side by side would only stack up
+   * that memory. Asked again while it runs, it stops after the current track.
+   */
+  async analyseAll(files: TFile[]) {
+    if (this.batch) {
+      this.batch.stopped = true;
+      return;
+    }
+    const todo = files.filter(f => !this.isMeasured(f.path));
+    if (todo.length === 0) {
+      new Notice(t("batchNothing"));
+      return;
+    }
+    const batch = { stopped: false };
+    this.batch = batch;
+    this.engine.trigger("data-changed"); // the button turns into "stop"
+    const notice = new Notice(t("batchProgress")(0, todo.length), 0);
+    let measured = 0;
+    let failed = 0;
+    try {
+      for (const [i, file] of todo.entries()) {
+        if (batch.stopped) break;
+        // deleted or renamed away while the batch was running
+        if (this.app.vault.getAbstractFileByPath(file.path) !== file) continue;
+        notice.setMessage(t("batchProgress")(i + 1, todo.length));
+        const outcome = await this.analyseTrack(file, false, true);
+        if (outcome === "measured") measured++;
+        else if (outcome === "failed") failed++;
+      }
+    } finally {
+      notice.hide();
+      this.batch = null;
+      this.engine.trigger("data-changed");
+    }
+    new Notice(t(batch.stopped ? "batchStopped" : "batchDone")(measured, failed), 6000);
   }
 
   /**

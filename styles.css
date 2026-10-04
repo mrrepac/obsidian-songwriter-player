@@ -701,6 +701,31 @@ body.sw-hide-embed-buttons .sw-embed-ext {
   cursor: default;
 }
 
+/* measure every unmeasured track at once; becomes "stop" while it runs */
+.sw-playlist-measure {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 4px;
+}
+
+.sw-playlist-measure svg {
+  width: 14px;
+  height: 14px;
+}
+
+.sw-playlist-measure-count {
+  font-size: var(--font-ui-smaller);
+  font-family: var(--font-monospace);
+}
+
+/* the panel takes focus so A S D F and the arrows reach it; no ring for that */
+.sw-root:focus,
+.sw-root:focus-visible {
+  outline: none;
+}
+
 .sw-playlist-none {
   padding: 8px 4px;
   text-align: center;

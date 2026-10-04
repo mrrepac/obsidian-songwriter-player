@@ -1,4 +1,4 @@
-import { ItemView, Menu, Platform, WorkspaceLeaf, TFile, setIcon } from "obsidian";
+import { ItemView, Menu, Notice, Platform, WorkspaceLeaf, TFile, setIcon } from "obsidian";
 import type SongwriterPlugin from "./main";
 import { PlayerEngine } from "./engine";
 import { EXT_BTN_TITLE, dragOutNatively, openExternally, revealInExplorer } from "./external";
@@ -38,6 +38,8 @@ export class SongwriterView extends ItemView {
   private toolsEl: HTMLElement;
   private filterBtn: HTMLElement;
   private progressEl: HTMLElement;
+  private measureBtn: HTMLElement;
+  private measureIcon = "";
   private noneEl: HTMLElement;
   /** The search is a glance, not a setting: it is not saved, and lives only here. */
   private query = "";
@@ -195,8 +197,39 @@ export class SongwriterView extends ItemView {
 
     this.registerDomEvent(this.engine.audio, "durationchange", () => this.updateTotalTime());
 
+    // Bare keys while the panel has focus — clicking anywhere in it gives it
+    // focus. Never global: letters there would fire in every search box.
+    this.contentEl.tabIndex = -1;
+    this.registerDomEvent(this.contentEl, "keydown", (e) => this.onPanelKey(e));
+
     this.applySettings();
     this.renderAll();
+  }
+
+  /**
+   * A S D F mark the loaded track (in a track, saved, dropped, new again),
+   * ↑ ↓ walk the playlist and ← → seek by the step set in the settings. Matched by physical key, so the Russian layout
+   * works without a second table; a text field keeps its keys.
+   */
+  private onPanelKey(e: KeyboardEvent) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest("input, textarea, select, [contenteditable]")) return;
+    const marks: Record<string, Verdict | undefined> = { KeyA: "used", KeyS: "saved", KeyD: "dropped", KeyF: undefined };
+    if (e.code in marks) {
+      const file = this.engine.file;
+      if (file) this.plugin.setVerdict(file.path, marks[e.code]);
+      else new Notice(t("noTrack"));
+    } else if (e.code === "ArrowUp" || e.code === "ArrowDown") {
+      void this.engine.step(e.code === "ArrowUp" ? -1 : 1);
+    } else if (e.code === "ArrowLeft" || e.code === "ArrowRight") {
+      const step = this.plugin.settings.skipSeconds;
+      this.engine.seekBy(e.code === "ArrowLeft" ? -step : step);
+    } else {
+      return;
+    }
+    e.preventDefault(); // the arrows would scroll the panel too
+    e.stopPropagation();
   }
 
   applySettings() {
@@ -628,6 +661,9 @@ export class SongwriterView extends ItemView {
     this.filterBtn.setAttribute("aria-label", t("filterTitle"));
     this.filterBtn.addEventListener("click", () => this.onFilterClick());
     this.progressEl = this.toolsEl.createSpan({ cls: "sw-playlist-progress" });
+    // a fresh pack arrives unmeasured: one click measures all of it
+    this.measureBtn = this.toolsEl.createEl("button", { cls: "clickable-icon sw-playlist-measure" });
+    this.measureBtn.addEventListener("click", () => void this.plugin.analyseAll(this.engine.queue));
 
     this.playlistList = this.playlistEl.createDiv({ cls: "sw-playlist-list" });
     this.noneEl = this.playlistEl.createDiv({ cls: "sw-playlist-none", text: t("playlistNone") });
@@ -998,6 +1034,20 @@ export class SongwriterView extends ItemView {
     this.progressEl.setText(`${sorted}/${total}`);
     this.progressEl.title = t("progressTitle")(sorted, total, count.used, count.saved, count.dropped);
     this.noneEl.toggle(total > 0 && shown === 0 && !this.plugin.settings.playlistCollapsed);
+
+    const running = this.plugin.measuringAll;
+    let unmeasured = 0;
+    for (const path of this.playlistRows.keys()) if (!this.plugin.isMeasured(path)) unmeasured++;
+    this.measureBtn.toggle(running || unmeasured > 0);
+    const icon = running ? "square" : "gauge";
+    if (icon !== this.measureIcon) {
+      this.measureIcon = icon;
+      this.measureBtn.empty();
+      setIcon(this.measureBtn, icon);
+      this.measureBtn.createSpan({ cls: "sw-playlist-measure-count" });
+    }
+    this.measureBtn.find(".sw-playlist-measure-count")?.setText(running ? "" : String(unmeasured));
+    this.measureBtn.setAttribute("aria-label", running ? t("measureStopTitle") : t("measureAllTitle")(unmeasured));
   }
 
 

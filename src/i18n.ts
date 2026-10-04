@@ -66,7 +66,16 @@ const en = {
   verdictUsed: "In a track",
   verdictSaved: "Saved",
   verdictDropped: "Dropped",
-  verdictRowLabel: (state: string) => `${state}. Click for the next mark: new → in a track → saved → dropped`,
+  verdictRowLabel: (state: string) =>
+    `${state}. Click for the next mark: new → in a track → saved → dropped. With the player panel focused: A in a track, S saved, D dropped, F new; ↑ ↓ walk the list, ← → seek`,
+  measureAllTitle: (n: number) => `Measure tempo and key of ${n} unmeasured ${n === 1 ? "track" : "tracks"}`,
+  measureStopTitle: "Stop measuring after the current track",
+  batchNothing: "Songwriter: every track in the playlist already has its tempo",
+  batchProgress: (i: number, n: number) => `Songwriter: measuring tempo and key — ${i} of ${n}`,
+  batchDone: (measured: number, failed: number) =>
+    `Songwriter: measured ${measured}` + (failed > 0 ? `, ${failed} could not be read` : ""),
+  batchStopped: (measured: number, failed: number) =>
+    `Songwriter: stopped — measured ${measured}` + (failed > 0 ? `, ${failed} could not be read` : ""),
   trashOne: "Delete file…",
   trashDropped: (n: number) => `Delete dropped tracks (${n})…`,
   trashOneTitle: (name: string) => `Delete “${name}”?`,
@@ -242,7 +251,16 @@ const ru: typeof en = {
   verdictUsed: "В треке",
   verdictSaved: "Сохранён",
   verdictDropped: "Дроп",
-  verdictRowLabel: (state: string) => `${state}. Клик — следующая отметка: новый → в треке → сохранён → дроп`,
+  verdictRowLabel: (state: string) =>
+    `${state}. Клик — следующая отметка: новый → в треке → сохранён → дроп. Когда фокус в панели плеера: A — в треке, S — сохранён, D — дроп, F — новый; ↑ ↓ — по списку, ← → — перемотка`,
+  measureAllTitle: (n: number) => `Измерить темп и тональность у неизмеренных: ${n}`,
+  measureStopTitle: "Остановить замер после текущего трека",
+  batchNothing: "Songwriter: у всех треков плейлиста темп уже есть",
+  batchProgress: (i: number, n: number) => `Songwriter: измеряю темп и тональность — ${i} из ${n}`,
+  batchDone: (measured: number, failed: number) =>
+    `Songwriter: измерено ${measured}` + (failed > 0 ? `, не удалось прочитать ${failed}` : ""),
+  batchStopped: (measured: number, failed: number) =>
+    `Songwriter: остановлено — измерено ${measured}` + (failed > 0 ? `, не удалось прочитать ${failed}` : ""),
   trashOne: "Удалить файл…",
   trashDropped: (n: number) => `Удалить дропнутые (${n})…`,
   trashOneTitle: (name: string) => `Удалить «${name}»?`,

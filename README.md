@@ -45,9 +45,15 @@ not in the UI).
   small button, and each click steps the track's mark on: new (an empty circle)
   → in a track (a note) → saved (a bookmark) → dropped (a cross, the row fades)
   → new again. Clicking it does not play anything. A row's right-click menu sets
-  any mark directly. Under the playlist header a search box narrows the list by
+  any mark directly. With the player panel focused (click anywhere in it), bare
+  keys work too: `A` in a track, `S` saved, `D` dropped, `F` new again — for
+  the loaded track — `↑` `↓` walk the playlist, and `←` `→` seek by the step
+  set in the settings. They are matched by
+  physical key, so any keyboard layout works, and a text field keeps its keys. Under the playlist header a search box narrows the list by
   name (every word, any order), a filter shows all tracks, new ones or one mark,
-  and a counter says how far the sorting has got (`34/97`). Dropped tracks can
+  and a counter says how far the sorting has got (`34/97`). A gauge button
+  there measures tempo and key of every track that has none yet — one at a
+  time, with progress in a notice; click it again to stop. Dropped tracks can
   go for good: one from its row's menu, all of them from the filter menu — after
   a confirmation that also says how many of them notes still link to. They go to
   the trash set in Obsidian's Files and links settings. There is also a command
