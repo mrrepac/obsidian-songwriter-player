@@ -41,7 +41,7 @@ export async function copyTrackToNote(
     const manager = app.fileManager as unknown as FileManagerMaybe;
     const suggested = typeof manager.getAvailablePathForAttachment === "function"
       ? await manager.getAvailablePathForAttachment(file.name, note.path)
-      : `${note.parent?.path ?? ""}/${file.name}`;
+      : !note.parent || note.parent.isRoot() ? file.name : `${note.parent.path}/${file.name}`;
 
     // no "/" means the attachment sits at the vault root, not in a folder
     // named after a mangled filename — slice(0, -1) would silently do that

@@ -44,7 +44,8 @@ export async function renderTransposed(app: App, file: TFile, opts: RenderOption
 
   const rendered = await stretchBuffer(decoded, opts);
   const wav = encodeWav(rendered, 0);
-  const folder = file.parent?.path ?? "";
+  // the vault root's path is "/", not "" — taken as is it builds "//name"
+  const folder = !file.parent || file.parent.isRoot() ? "" : file.parent.path;
   const target = await uniquePath(app, folder, renderedName(file.basename, opts), "wav");
   return await app.vault.createBinary(target, wav);
 }
