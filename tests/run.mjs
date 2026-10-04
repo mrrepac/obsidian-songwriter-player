@@ -10,8 +10,9 @@ import pickup from "./pickup.test.mjs";
 import copy from "./copy.test.mjs";
 import playlist from "./playlist.test.mjs";
 import worker from "./worker.test.mjs";
+import stretch from "./stretch.test.mjs";
 
-const suites = [settings, mediasession, hotkeys, pickup, copy, playlist, worker];
+const suites = [settings, mediasession, hotkeys, pickup, copy, playlist, worker, stretch];
 
 let ok = true;
 for (const run of suites) {

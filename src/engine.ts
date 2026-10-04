@@ -1,7 +1,7 @@
 import { Events, Notice, Platform, TFile } from "obsidian";
 import type SongwriterPlugin from "./main";
 import { QueueSource, TrackData, emptyTrackData, formatTime } from "./types";
-import { createPitchShifter, ensurePitchWorklet, semitonesToRatio } from "./pitch";
+import { StretchNode, createStretch } from "./stretch";
 import { t } from "./i18n";
 
 /**
@@ -327,15 +327,20 @@ export class PlayerEngine extends Events {
 
   // ---- transposition (desktop only) ----
   //
-  // The shifter is inserted between the element and the speakers, so the
+  // Signalsmith Stretch sits between the element and the speakers, so the
   // element stays the source of truth for time: seeking, the counters and the
-  // playhead keep working untouched. The graph is built only
-  // when a shift is actually asked for — until then the audio path is exactly
-  // what it was, and routing an element through Web Audio (flaky on mobile
-  // WebViews) never happens there at all.
+  // playhead keep working untouched. The graph is built only when a shift is
+  // actually asked for — until then the audio path is exactly what it was, and
+  // routing an element through Web Audio (flaky on mobile WebViews) never
+  // happens there at all. Back at 0 the stretcher is taken out of the path and
+  // stopped: no processing, no latency, the sound exactly as recorded.
 
   private audioCtx: AudioContext | null = null;
-  private pitchNode: AudioWorkletNode | null = null;
+  private source: MediaElementAudioSourceNode | null = null;
+  private stretch: StretchNode | null = null;
+  /** In flight while the graph is being built, so two quick presses build one. */
+  private graphReady: Promise<void> | null = null;
+  private shifted = false;
 
   get semitones(): number {
     return this.peekData()?.semitones ?? 0;
@@ -361,37 +366,62 @@ export class PlayerEngine extends Events {
   }
 
   private async applySemitones() {
-    const value = this.semitones;
     // no shift and no graph yet: leave the plain audio path alone
-    if (value === 0 && !this.pitchNode) return;
+    if (this.semitones === 0 && !this.graphReady) return;
     try {
       await this.ensureGraph();
-      // AudioParamMap is typed without get() in the DOM lib this project targets
-      const params = this.pitchNode?.parameters as unknown as Map<string, AudioParam> | undefined;
-      params?.get("ratio")?.setValueAtTime(semitonesToRatio(value), this.audioCtx?.currentTime ?? 0);
+      // read again: another press may have landed while the graph was built
+      this.route(this.semitones);
     } catch (e) {
       console.warn("Songwriter: pitch shifting unavailable", e);
       new Notice(t("pitchUnavailable"));
     }
   }
 
-  private async ensureGraph() {
-    if (this.pitchNode) {
-      if (this.audioCtx?.state === "suspended") await this.audioCtx.resume();
-      return;
+  private ensureGraph(): Promise<void> {
+    if (!this.graphReady) {
+      this.graphReady = this.buildGraph().catch((e) => {
+        this.graphReady = null; // let a later press try again
+        throw e;
+      });
     }
+    return this.graphReady.then(async () => {
+      if (this.audioCtx?.state === "suspended") await this.audioCtx.resume();
+    });
+  }
+
+  private async buildGraph() {
     const AC: typeof AudioContext =
       window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     const ctx = new AC();
-    await ensurePitchWorklet(ctx);
-    // createMediaElementSource can only ever be called once for an element
+    const stretch = await createStretch(ctx);
+    // createMediaElementSource can only ever be called once for an element —
+    // and from here on the element is heard only through this graph
     const source = ctx.createMediaElementSource(this.audio);
-    const node = createPitchShifter(ctx);
-    source.connect(node);
-    node.connect(ctx.destination);
+    source.connect(ctx.destination);
     this.audioCtx = ctx;
-    this.pitchNode = node;
-    if (ctx.state === "suspended") await ctx.resume();
+    this.source = source;
+    this.stretch = stretch;
+    this.shifted = false;
+  }
+
+  /** Through the stretcher for a shift, straight to the speakers at 0. */
+  private route(semitones: number) {
+    const { audioCtx: ctx, source, stretch } = this;
+    if (!ctx || !source || !stretch) return;
+    const shift = semitones !== 0;
+    if (shift) void stretch.schedule({ active: true, semitones, output: ctx.currentTime });
+    if (shift === this.shifted) return;
+    source.disconnect();
+    stretch.disconnect();
+    if (shift) {
+      source.connect(stretch);
+      stretch.connect(ctx.destination);
+    } else {
+      source.connect(ctx.destination);
+      void stretch.schedule({ active: false, output: ctx.currentTime });
+    }
+    this.shifted = shift;
   }
 
   private applyRate() {
@@ -530,7 +560,9 @@ export class PlayerEngine extends Events {
     if (this.audioCtx) {
       void this.audioCtx.close();
       this.audioCtx = null;
-      this.pitchNode = null;
+      this.source = null;
+      this.stretch = null;
+      this.graphReady = null;
     }
     this.audio.pause();
     this.audio.removeAttribute("src");

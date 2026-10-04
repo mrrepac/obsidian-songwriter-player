@@ -1,7 +1,7 @@
 // types only: keeps this module runnable in a bare browser harness, where the
 // whole render path (decode → shift → wav) can be verified without Obsidian
 import type { App, TFile } from "obsidian";
-import { createPitchShifter, ensurePitchWorklet, pitchLatency, semitonesToRatio } from "./pitch";
+import { createStretch } from "./stretch";
 
 /**
  * Bakes the transposition (and the speed, if it is off) into a new audio file
@@ -42,30 +42,40 @@ export async function renderTransposed(app: App, file: TFile, opts: RenderOption
     void decodeCtx.close();
   }
 
-  // The source is resampled by `rate` — which moves the pitch as well — and the
-  // shifter then puts the pitch where it belongs: ratio = 2^(n/12) / rate.
-  // Net effect: tempo × rate, pitch × 2^(n/12), which is what is being heard.
-  const ratio = semitonesToRatio(opts.semitones) / opts.rate;
-  const latency = pitchLatency(ratio);
-  const length = Math.ceil(decoded.length / opts.rate) + latency + 1;
-
-  const offline = new OfflineAudioContext(Math.min(decoded.numberOfChannels, 2), length, SAMPLE_RATE);
-  await ensurePitchWorklet(offline);
-  const source = offline.createBufferSource();
-  source.buffer = decoded;
-  source.playbackRate.value = opts.rate;
-  const shifter = createPitchShifter(offline);
-  const param = shifter.parameters as unknown as Map<string, AudioParam>;
-  param.get("ratio")?.setValueAtTime(ratio, 0);
-  source.connect(shifter);
-  shifter.connect(offline.destination);
-  source.start();
-  const rendered = await offline.startRendering();
-
-  const wav = encodeWav(rendered, latency);
+  const rendered = await stretchBuffer(decoded, opts);
+  const wav = encodeWav(rendered, 0);
   const folder = file.parent?.path ?? "";
   const target = await uniquePath(app, folder, renderedName(file.basename, opts), "wav");
   return await app.vault.createBinary(target, wav);
+}
+
+/**
+ * Speed and key in one pass, the way they are heard: Signalsmith Stretch reads
+ * the decoded track from its own buffer at `rate` and shifts it by
+ * `semitones`. The stretcher needs a run-up to line its output up with its
+ * input, so the playback is scheduled `lead` seconds in and that stretch of
+ * the render is dropped again — the copy starts exactly where the track does,
+ * which matters once it sits on a DAW's grid.
+ */
+export async function stretchBuffer(decoded: AudioBuffer, opts: RenderOptions): Promise<AudioBuffer> {
+  const channels = Math.min(decoded.numberOfChannels, 2);
+  const probe = new OfflineAudioContext(channels, 1, SAMPLE_RATE);
+  const lead = await (await createStretch(probe)).latency();
+  const leadFrames = Math.ceil(lead * SAMPLE_RATE);
+  const frames = Math.ceil(decoded.length / opts.rate);
+
+  const offline = new OfflineAudioContext(channels, leadFrames + frames, SAMPLE_RATE);
+  const stretch = await createStretch(offline);
+  const left = decoded.getChannelData(0);
+  const right = decoded.numberOfChannels > 1 ? decoded.getChannelData(1) : left;
+  await stretch.addBuffers([left, right]);
+  await stretch.schedule({ active: true, input: 0, output: lead, rate: opts.rate, semitones: opts.semitones });
+  stretch.connect(offline.destination);
+  const rendered = await offline.startRendering();
+
+  const out = new OfflineAudioContext(channels, frames, SAMPLE_RATE).createBuffer(channels, frames, SAMPLE_RATE);
+  for (let c = 0; c < channels; c++) out.copyToChannel(rendered.getChannelData(c).subarray(leadFrames, leadFrames + frames), c);
+  return out;
 }
 
 /** Keeps a second render from failing on an existing name. */

@@ -154,6 +154,10 @@ detection — it is licensed under the AGPL-3.0, so the combined work is too. Th
 essentia sources are at <https://github.com/MTG/essentia>; the copy shipped inside
 `main.js` is the unmodified npm build.
 
+Transposition is done by [Signalsmith Stretch](https://signalsmith-audio.co.uk/code/stretch/)
+1.3.2 (© Geraint Luff / Signalsmith Audio), bundled unmodified from npm under the MIT
+license, which is compatible with the AGPL.
+
 Using the plugin carries no obligations. Distributing a modified version does: the
 source has to stay available under the same license.
 
