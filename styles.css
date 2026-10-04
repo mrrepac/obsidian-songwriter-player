@@ -187,10 +187,6 @@ body.sw-hide-embed-buttons .sw-ext-btn {
   border-color: var(--interactive-accent);
 }
 
-.sw-embed-native-hidden {
-  display: none !important;
-}
-
 .sw-embed-main {
   display: flex;
   align-items: center;

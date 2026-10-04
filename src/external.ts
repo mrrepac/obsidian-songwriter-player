@@ -13,12 +13,12 @@ export function dragOutNatively(app: App, file: TFile): boolean {
   if (!Platform.isDesktopApp) return false;
   const adapter = app.vault.adapter;
   if (!(adapter instanceof FileSystemAdapter)) return false;
-  const req = (window as unknown as { require?: (id: string) => any }).require;
+  const req = (window as unknown as { require?: NodeRequireLike }).require;
   if (!req) return false;
 
   try {
-    const { nativeImage } = req("electron");
-    const webContents = req("@electron/remote").getCurrentWebContents();
+    const { nativeImage } = req("electron") as ElectronLike;
+    const webContents = (req("@electron/remote") as RemoteLike).getCurrentWebContents();
     const path = adapter.getFullPath(file.path);
     // an icon is mandatory: a 1×1 image is the cheapest non-empty one, and
     // createEmpty covers the platforms that reject it
@@ -33,6 +33,21 @@ export function dragOutNatively(app: App, file: TFile): boolean {
     console.error("Songwriter: native drag failed", e);
     return false;
   }
+}
+
+// The slice of Electron the native drag touches; Obsidian ships no types for it.
+type NodeRequireLike = (id: string) => unknown;
+interface NativeImageLike { readonly __brand?: "NativeImage" }
+interface ElectronLike {
+  nativeImage: {
+    createFromDataURL(url: string): NativeImageLike;
+    createEmpty(): NativeImageLike;
+  };
+}
+interface RemoteLike {
+  getCurrentWebContents(): {
+    startDrag(item: { file: string; icon: NativeImageLike }): void;
+  };
 }
 
 const DRAG_PIXEL =

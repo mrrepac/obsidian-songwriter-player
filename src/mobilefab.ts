@@ -39,7 +39,7 @@ export class MobileMarkerButton {
       e.preventDefault();
       const engine = this.plugin.engine;
       if (this.plugin.settings.fabMode === "smart" && engine.playing) {
-        engine.playPause(); // smart mode: pause without leaving the note
+        void engine.playPause(); // smart mode: pause without leaving the note
       } else {
         void engine.playFromMarker(); // jump to marker (or start) and play
       }

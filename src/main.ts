@@ -89,6 +89,7 @@ export default class SongwriterPlugin extends Plugin {
   mobileFab: MobileMarkerButton;
   mediaSession: MediaSessionBridge;
   private saveTimer: number | null = null;
+  private unloaded = false;
 
   /**
    * Default hotkeys are offered, not imposed.
@@ -418,6 +419,7 @@ export default class SongwriterPlugin extends Plugin {
   }
 
   onunload() {
+    this.unloaded = true;
     if (this.saveTimer !== null) {
       window.clearTimeout(this.saveTimer);
       this.saveTimer = null;
@@ -583,7 +585,12 @@ export default class SongwriterPlugin extends Plugin {
         new Notice(t("analyseFailed")(file.basename));
         return;
       }
-      const d = this.trackData(path);
+      // the track may have been renamed or deleted while it was measured: a
+      // TFile follows its renames, so its current path is the one to write to,
+      // and a deleted one gets nothing — a record written under a dead path
+      // carries a tempo, so the save-time pruning would never clear it
+      if (this.app.vault.getAbstractFileByPath(file.path) !== file) return;
+      const d = this.trackData(file.path);
       d.bpm = result.bpm;
       d.key = result.key;
       d.scale = result.scale;
@@ -779,15 +786,15 @@ export default class SongwriterPlugin extends Plugin {
   async loadSettings() {
     const raw = await this.readDataFile();
     const loaded = (raw ?? {}) as LegacySettings;
-    // migrate from v0.1.0 (startPoint + named markers); `rate` (playback
-    // speed, removed for now), the withdrawn beat-grid settings and old
-    // per-track BPM/key fields are dropped simply by not copying them over.
-    const {
-      tracks: loadedTracks, startFromPointOnLoad,
-      rate, beatGrid, snapToBeats, snapBars,
-      ...rest
-    } = loaded;
-    void [rate, beatGrid, snapToBeats, snapBars];
+    // migrate from v0.1.0 (startPoint + named markers)
+    const { tracks: loadedTracks, startFromPointOnLoad, ...legacyRest } = loaded;
+    // Only settings this version knows are carried over. Anything else — the
+    // old global `rate`, the withdrawn beat-grid keys, a typo such as the
+    // `autoAnalyze` that sat next to the real `autoAnalyse` — would otherwise
+    // be written back on every save, forever.
+    const rest = Object.fromEntries(
+      Object.entries(legacyRest).filter(([key]) => key in DEFAULT_SETTINGS && key !== "tracks")
+    ) as Partial<Omit<SongwriterSettings, "tracks">>;
     this.settings = { ...DEFAULT_SETTINGS, ...rest, tracks: {} };
     if (startFromPointOnLoad !== undefined && rest.startFromMarkerOnLoad === undefined) {
       this.settings.startFromMarkerOnLoad = startFromPointOnLoad;
@@ -809,11 +816,7 @@ export default class SongwriterPlugin extends Plugin {
         loopB: raw.loopB ?? null,
         plays: typeof raw.plays === "number" ? raw.plays : 0,
         playedSec: typeof raw.playedSec === "number" ? raw.playedSec : 0,
-        // measurements follow the current preferred range: changing it re-folds
-        // everything that was not corrected by hand
-        bpm: raw.bpm != null && !raw.musicalEdited
-          ? Math.round(foldIntoWindow(raw.bpm, this.settings.tempoWindowLow))
-          : raw.bpm ?? null,
+        bpm: raw.bpm ?? null,
         key: raw.key ?? null,
         scale: raw.scale ?? null,
         scaleAlt: raw.scaleAlt ?? null,
@@ -826,9 +829,39 @@ export default class SongwriterPlugin extends Plugin {
         semitones: restoreSemitones(raw.semitones)
       };
     }
+    this.refoldTempos();
+  }
+
+  /**
+   * Measurements follow the preferred tempo range: every tempo that was not
+   * corrected by hand is folded into it. Folding is octave-invariant, so doing
+   * it again over an already folded value lands where the raw one would.
+   */
+  refoldTempos() {
+    for (const d of Object.values(this.settings.tracks)) {
+      if (d.bpm != null && !d.musicalEdited) {
+        d.bpm = Math.round(foldIntoWindow(d.bpm, this.settings.tempoWindowLow));
+      }
+    }
+  }
+
+  /** The tempo window moved: re-fold now, not on the next start. */
+  applyTempoWindow() {
+    this.refoldTempos();
+    this.requestSave();
+    const engine = this.engine;
+    // a folder sorted by tempo may now be in a different order
+    if (this.settings.playlistSort === "tempo" && engine.queueSource?.kind === "folder" && engine.queue[0]) {
+      engine.setQueue(this.collectFolderAudios(engine.queue[0]), engine.queueSource);
+    }
+    engine.trigger("data-changed");
+    this.refreshViews();
   }
 
   requestSave() {
+    // the engine's last pause event lands after onunload; a save it asks for
+    // then would be a write from a plugin that is already gone
+    if (this.unloaded) return;
     if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => {
       this.saveTimer = null;

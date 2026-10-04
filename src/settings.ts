@@ -102,12 +102,11 @@ export class SongwriterSettingTab extends PluginSettingTab {
     describeWindow();
     windowSetting.addSlider(slider => slider
       .setLimits(40, 120, 5)
-      .setDynamicTooltip()
       .setValue(this.plugin.settings.tempoWindowLow)
-      .onChange(async (value) => {
+      .onChange((value) => {
         this.plugin.settings.tempoWindowLow = value;
         describeWindow();
-        await this.plugin.saveSettings();
+        this.plugin.applyTempoWindow(); // saves, and shows the new tempos at once
       }));
 
     new Setting(containerEl).setName(t("headingHotkeys")).setHeading();

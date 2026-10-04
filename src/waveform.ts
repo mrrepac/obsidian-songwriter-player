@@ -1,4 +1,4 @@
-import { TFile } from "obsidian";
+import { EventRef, TFile } from "obsidian";
 import type SongwriterPlugin from "./main";
 import { PlayerEngine } from "./engine";
 import { analyzeAudio, WAVE_BINS as BINS } from "./analysis";
@@ -69,8 +69,21 @@ export class WaveformRenderer {
     this.resizeObserver = new ResizeObserver(() => this.markDirty());
     this.resizeObserver.observe(this.wrap);
 
+    // the frame loop sleeps whenever nothing plays, so these are what wake it:
+    // playback starting or stopping, and the playhead jumping while paused
+    this.playStateRef = engine.on("play-state", this.onPlayState);
+    engine.audio.addEventListener("seeked", this.onSeeked);
+    engine.audio.addEventListener("durationchange", this.onSeeked);
+
     this.startLoopIfActive();
   }
+
+  private playStateRef: EventRef;
+  private onPlayState = () => {
+    this.startLoopIfActive();
+    this.markDirty(); // the final frame after a stop: the playhead where it halted
+  };
+  private onSeeked = () => this.markDirty();
 
   destroy() {
     if (this.rafId) window.cancelAnimationFrame(this.rafId);
@@ -78,6 +91,9 @@ export class WaveformRenderer {
     this.rafId = 0;
     this.pendingDraw = 0;
     this.resizeObserver.disconnect();
+    this.engine.offref(this.playStateRef);
+    this.engine.audio.removeEventListener("seeked", this.onSeeked);
+    this.engine.audio.removeEventListener("durationchange", this.onSeeked);
   }
 
   // ---- active state & duration ----
@@ -134,12 +150,19 @@ export class WaveformRenderer {
   }
 
   // ---- animation ----
-  // The permanent rAF runs only while this renderer is active (playhead can
-  // move). Parked/inactive renderers repaint on demand via a one-shot frame,
-  // so a note full of inline waveforms costs almost nothing when idle.
+  // The frame loop runs only while this renderer's track is actually playing
+  // — the only time the playhead moves by itself. Everything else (a paused
+  // seek, a new marker, a resize) repaints through markDirty's one-shot frame,
+  // so an idle panel and a note full of inline waveforms cost nothing. Before
+  // this the panel's loop ran at 60 fps for as long as a track was loaded,
+  // music or not.
+
+  private get shouldAnimate(): boolean {
+    return this.active && this.engine.playing;
+  }
 
   private startLoopIfActive() {
-    if (this.active) {
+    if (this.shouldAnimate) {
       if (this.rafId === 0) this.rafId = window.requestAnimationFrame(this.loop);
     } else if (this.rafId !== 0) {
       window.cancelAnimationFrame(this.rafId);
@@ -148,17 +171,18 @@ export class WaveformRenderer {
   }
 
   private loop = () => {
-    this.rafId = window.requestAnimationFrame(this.loop);
     const now = this.engine.audio.currentTime;
-    // redraw on any position change (playing OR a paused seek) or a dirty
-    // flag; skip work entirely when idle. onTick rides along so the time
-    // readout tracks the playhead without a separate 60fps drumbeat.
+    // redraw on a position change or a dirty flag. onTick rides along so the
+    // time readout tracks the playhead without a separate 60fps drumbeat.
     if (this.dirty || now !== this.lastDrawnTime) {
       this.draw();
       this.lastDrawnTime = now;
       this.dirty = false;
       this.onTick?.();
     }
+    // checked after the frame, not before: the frame that notices the stop
+    // still paints the playhead where it halted
+    this.rafId = this.shouldAnimate ? window.requestAnimationFrame(this.loop) : 0;
   };
 
   markDirty() {

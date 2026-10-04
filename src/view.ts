@@ -183,6 +183,9 @@ export class SongwriterView extends ItemView {
   applySettings() {
     this.contentEl.style.setProperty("--sw-wave-height", `${this.plugin.settings.waveHeight}px`);
     this.refreshSeekLabels();
+    // a setting can change what every row shows (the tempo window re-folds
+    // them all), and data-changed only refreshes the current one
+    for (const path of this.playlistRows.keys()) this.fillPlaylistRow(path);
   }
 
   async onClose() {
@@ -765,8 +768,11 @@ export class SongwriterView extends ItemView {
     // on hover means reading the whole pack while the mouse wanders down the
     // list. Button 0 only — a right click just opens the context menu, and
     // reading the whole file for a menu it will never drag is wasted work
+    // Desktop only: on a phone a tap fires mousedown too, and no drag ever
+    // leaves the app there, so every tap on a row would read a whole file for
+    // nothing
     row.addEventListener("mousedown", (e) => {
-      if (e.button === 0) void this.prepareDragFile(file);
+      if (e.button === 0 && Platform.isDesktopApp) void this.prepareDragFile(file);
     });
     row.addEventListener("dragstart", (e) => {
       // Alt takes the native, on-disk route instead of the ordinary drag
@@ -795,7 +801,16 @@ export class SongwriterView extends ItemView {
   private async prepareDragFile(file: TFile) {
     if (this.dragFile?.path === file.path || this.dragPending === file.path) return;
     this.dragPending = file.path;
-    const bytes = await this.app.vault.readBinary(file);
+    let bytes: ArrayBuffer;
+    try {
+      bytes = await this.app.vault.readBinary(file);
+    } catch (e) {
+      // left set, the pending path would turn every later mousedown on this
+      // row into an early return — the track could never be dragged out again
+      if (this.dragPending === file.path) this.dragPending = null;
+      console.warn("Songwriter: could not read the track for dragging", e);
+      return;
+    }
     const mime = SongwriterView.DRAG_MIME[file.extension.toLowerCase()] ?? "application/octet-stream";
     const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
     if (this.dragPending !== file.path) {

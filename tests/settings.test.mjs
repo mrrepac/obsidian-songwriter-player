@@ -156,6 +156,42 @@ export default async function run() {
       () => saved.tracks["measured.mp3"].beatOffset === undefined);
   }
 
+  // ---- keys this version does not know ----
+  // The real data.json carried `autoAnalyze` (a "z") next to the live
+  // `autoAnalyse` for months, because a load used to pass everything through.
+  {
+    const { saved } = await roundTrip({
+      autoAnalyze: true,
+      autoAnalyse: false,
+      somethingNew: 42,
+      tracks: { "measured.mp3": track({ bpm: 130, plays: 1 }) }
+    });
+    s.check("an unknown setting is not written back",
+      () => saved.autoAnalyze === undefined && saved.somethingNew === undefined);
+    s.check("while the known one next to it is kept", () => saved.autoAnalyse === false);
+  }
+
+  // ---- moving the tempo window re-folds at once, not on the next start ----
+  {
+    stored = null;
+    files = { [DATA]: JSON.stringify({
+      tempoWindowLow: 80,
+      tracks: {
+        "fast.mp3": track({ bpm: 160, plays: 1 }),
+        "by-hand.mp3": track({ bpm: 160, musicalEdited: true, plays: 1 })
+      }
+    }) };
+    const plugin = makePlugin();
+    await plugin.loadSettings();
+    plugin.settings.tempoWindowLow = 100;
+    plugin.refoldTempos();
+    s.check("a measured tempo moves into the new window", () => plugin.settings.tracks["fast.mp3"].bpm === 160);
+    plugin.settings.tempoWindowLow = 60;
+    plugin.refoldTempos();
+    s.check("and back, without drifting", () => plugin.settings.tracks["fast.mp3"].bpm === 80);
+    s.check("a hand correction still stays put", () => plugin.settings.tracks["by-hand.mp3"].bpm === 160);
+  }
+
   // ---- defaults ----
   {
     const { loaded } = await roundTrip({});

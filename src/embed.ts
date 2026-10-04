@@ -213,7 +213,7 @@ class EmbedPlayer {
     this.file = file;
 
     const engine = plugin.engine;
-    audio.addClass("sw-embed-native-hidden");
+    audio.hide();
 
     const root = createDiv({ cls: "sw-embed" });
     this.root = root;
@@ -335,7 +335,7 @@ class EmbedPlayer {
     this.plugin.app.workspace.offref(this.cssRef);
     this.wave.destroy();
     this.root.remove();
-    this.audio.removeClass("sw-embed-native-hidden");
+    this.audio.show();
     this.audio.removeAttribute("data-sw-processed");
   }
 }

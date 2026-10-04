@@ -10,6 +10,21 @@ if you want to view the source, please visit the github repository of this plugi
 const prod = process.argv[2] === "production";
 
 /**
+ * essentia's Emscripten loader carries a Node branch that reaches for fs,
+ * path and crypto. It never runs inside a Web Worker, but the bare require
+ * makes the plugin look like it reads arbitrary files from disk. Empty stubs
+ * keep the branch compiling and drop the requires from the bundle.
+ */
+const NODE_STUBS = /^(node:)?(fs|path|crypto)$/;
+const stubNodeModules = {
+  name: "stub-node-modules",
+  setup(build) {
+    build.onResolve({ filter: NODE_STUBS }, args => ({ path: args.path, namespace: "node-stub" }));
+    build.onLoad({ filter: /.*/, namespace: "node-stub" }, () => ({ contents: "module.exports = {};" }));
+  }
+};
+
+/**
  * The analysis worker is bundled first and injected into the plugin as a
  * string. Obsidian installs a single main.js, so the worker cannot ship as its
  * own file — and it must not run on the UI thread, because essentia's tempo
@@ -18,7 +33,8 @@ const prod = process.argv[2] === "production";
 const workerBuild = await esbuild.build({
   entryPoints: ["src/analysis-worker.ts"],
   bundle: true,
-  external: [...builtinModules],
+  plugins: [stubNodeModules],
+  external: builtinModules.filter(m => !NODE_STUBS.test(m)),
   format: "iife",
   target: "es2016",
   logLevel: "warning",
