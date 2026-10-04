@@ -64,10 +64,12 @@ npm run dev     # watch-режим
 
 ## Лицензия
 
-**GNU AGPL-3.0.** В плагин вшита [essentia.js](https://github.com/MTG/essentia.js) 0.1.3
-(Music Technology Group, Universitat Pompeu Fabra) — ей считаются темп и тональность.
-Она под AGPL-3.0, поэтому и собранный плагин целиком под AGPL-3.0. Исходники essentia
-лежат на <https://github.com/MTG/essentia>; внутри `main.js` — неизменённая сборка из npm.
+**GNU AGPL-3.0.** Темп считает нейросеть [TempoCNN](https://github.com/hendriks73/tempo-cnn)
+(модель `deeptemp_k16`, © Hendrik Schreiber) — она под AGPL-3.0, поэтому и собранный плагин
+целиком под AGPL-3.0. Тональность считает [S-KEY](https://github.com/deezer/skey)
+(© Deezer, ICASSP 2025) под лицензией MIT. Обе сети работают на чистом JavaScript внутри
+плагина: веса переведены из исходных моделей скриптом `tools/export-models.py` в папку
+`models/`, а `tests/detect.test.mjs` сверяет порт с ответами оригиналов.
 
 Транспонирование делает [Signalsmith Stretch](https://signalsmith-audio.co.uk/code/stretch/)
 1.3.2 (© Geraint Luff / Signalsmith Audio) — неизменённая сборка из npm под лицензией MIT,

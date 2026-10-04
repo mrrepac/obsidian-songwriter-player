@@ -148,11 +148,13 @@ migration is written faithfully and then dropped on the next start.
 
 ## License
 
-**GNU AGPL-3.0.** The plugin bundles [essentia.js](https://github.com/MTG/essentia.js)
-0.1.3 (Music Technology Group, Universitat Pompeu Fabra) for tempo and key
-detection — it is licensed under the AGPL-3.0, so the combined work is too. The
-essentia sources are at <https://github.com/MTG/essentia>; the copy shipped inside
-`main.js` is the unmodified npm build.
+**GNU AGPL-3.0.** Tempo is measured by [TempoCNN](https://github.com/hendriks73/tempo-cnn)
+(model `deeptemp_k16`, © Hendrik Schreiber), licensed under the AGPL-3.0, so the
+combined work is too. Key is measured by [S-KEY](https://github.com/deezer/skey)
+(© Deezer, ICASSP 2025), under the MIT license. Both networks run in plain
+JavaScript inside the plugin: the weights are converted from the original models
+by `tools/export-models.py` into `models/`, and `tests/detect.test.mjs` holds the
+port to the originals' own output.
 
 Transposition is done by [Signalsmith Stretch](https://signalsmith-audio.co.uk/code/stretch/)
 1.3.2 (© Geraint Luff / Signalsmith Audio), bundled unmodified from npm under the MIT
