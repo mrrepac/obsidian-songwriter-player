@@ -6,7 +6,7 @@ import { bundle, load, suite } from "./harness.mjs";
 
 export default async function run() {
   const s = suite("playlist — the order of things");
-  const { sortTracks } = load(await bundle("src/playlist.ts"));
+  const { sortTracks, nextVerdict, rowVisible } = load(await bundle("src/playlist.ts"));
 
   const files = [
     { path: "b.mp3", basename: "b2", mtime: 300, bpm: 90, plays: 1 },
@@ -24,6 +24,28 @@ export default async function run() {
     sortTracks(files, "plays");
     return files[0].path === "b.mp3";
   });
+
+  // ---- sorting a pack: one button steps through the marks ----
+  {
+    let v;
+    const seen = [];
+    for (let i = 0; i < 4; i++) { v = nextVerdict(v); seen.push(v ?? "new"); }
+    s.check("new → used → saved → dropped → new", () => seen.join(",") === "used,saved,dropped,new");
+    s.check("a mark it does not know starts the cycle over", () => nextVerdict("taken") === "used");
+  }
+
+  // ---- which rows the search and the filter let through ----
+  {
+    s.check("no search and no filter shows everything", () => rowVisible("Yokai hunter", "dropped", "all", ""));
+    s.check("new hides every marked track", () => !rowVisible("a", "used", "unsorted", "")
+      && !rowVisible("a", "dropped", "unsorted", "") && rowVisible("a", undefined, "unsorted", ""));
+    s.check("a mark's filter shows only that mark", () => rowVisible("a", "saved", "saved", "")
+      && !rowVisible("a", "used", "saved", "") && !rowVisible("a", undefined, "saved", ""));
+    s.check("search ignores case and word order", () => rowVisible("Dark Hyperpop x Drain - running", undefined, "all", "drain DARK"));
+    s.check("every word has to match", () => !rowVisible("Dark Hyperpop", undefined, "all", "dark trap"));
+    s.check("ё and е are the same letter", () => rowVisible("Ёлка бит", undefined, "all", "елка"));
+    s.check("search and filter work together", () => !rowVisible("drain", "used", "unsorted", "drain"));
+  }
 
   return s.report();
 }

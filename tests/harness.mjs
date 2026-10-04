@@ -76,6 +76,7 @@ export function obsidianStub(over = {}) {
     PluginSettingTab: Empty,
     MarkdownView: Empty,
     Menu: Empty,
+    Modal: Empty,
     Setting: Empty,
     WorkspaceLeaf: Empty,
     App: Empty,

@@ -7,7 +7,15 @@ import { KEY_PROFILES } from "./musical";
 import { playTriad } from "./tone";
 import { transposeKey } from "./pitch";
 import { renderedName } from "./render";
-import { PlaylistSort, formatKey, formatPlayed, formatTime } from "./types";
+import { PlaylistFilter, PlaylistSort, formatKey, formatPlayed, formatTime } from "./types";
+import { VERDICTS, Verdict, nextVerdict, rowVisible } from "./playlist";
+
+/** How each verdict looks in a playlist row: its icon and its name. */
+const VERDICT_UI: Record<Verdict, { icon: string; label: "verdictUsed" | "verdictSaved" | "verdictDropped" }> = {
+  used: { icon: "music", label: "verdictUsed" },
+  saved: { icon: "bookmark", label: "verdictSaved" },
+  dropped: { icon: "x", label: "verdictDropped" }
+};
 import { t } from "./i18n";
 
 export const VIEW_TYPE_SONGWRITER = "songwriter-player";
@@ -26,10 +34,19 @@ export class SongwriterView extends ItemView {
   private playlistCount: HTMLElement;
   private sortBtn: HTMLElement;
   private playlistChevron: HTMLElement;
+  /** Search, filter and the sorting progress — the tools for going through a pack. */
+  private toolsEl: HTMLElement;
+  private filterBtn: HTMLElement;
+  private progressEl: HTMLElement;
+  private noneEl: HTMLElement;
+  /** The search is a glance, not a setting: it is not saved, and lives only here. */
+  private query = "";
   private playlistRows = new Map<string, {
     row: HTMLElement;
     num: HTMLElement;
     index: number;
+    name: string;
+    verdict: HTMLElement;
     flag: HTMLElement;
     plays: HTMLElement;
     musical: HTMLElement;
@@ -161,7 +178,9 @@ export class SongwriterView extends ItemView {
     this.registerEvent(this.engine.on("data-changed", () => {
       this.updatePlays();
       this.updateMusical();
-      this.updatePlaylistRow();
+      // every row, not just the current one: a verdict can land on any of them
+      // from the context menu, and the progress counts the whole list
+      this.refillPlaylistRows();
       this.updateMarkerBtn();
       this.wave?.markDirty();
     }));
@@ -183,9 +202,8 @@ export class SongwriterView extends ItemView {
   applySettings() {
     this.contentEl.style.setProperty("--sw-wave-height", `${this.plugin.settings.waveHeight}px`);
     this.refreshSeekLabels();
-    // a setting can change what every row shows (the tempo window re-folds
-    // them all), and data-changed only refreshes the current one
-    for (const path of this.playlistRows.keys()) this.fillPlaylistRow(path);
+    // a setting can change what every row shows (the tempo window re-folds them all)
+    this.refillPlaylistRows();
   }
 
   async onClose() {
@@ -589,12 +607,70 @@ export class SongwriterView extends ItemView {
       this.applyPlaylistCollapsed();
     });
 
+    // sits outside the head: a click in the search box must not fold the list
+    this.toolsEl = this.playlistEl.createDiv({ cls: "sw-playlist-tools" });
+    const search = this.toolsEl.createEl("input", { cls: "sw-playlist-search", type: "search" });
+    search.placeholder = t("searchPlaceholder");
+    search.setAttribute("aria-label", t("searchPlaceholder"));
+    search.addEventListener("input", () => {
+      this.query = search.value;
+      this.refillPlaylistRows();
+    });
+    search.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && search.value) {
+        e.stopPropagation(); // clear the search, don't close whatever holds the panel
+        search.value = "";
+        this.query = "";
+        this.refillPlaylistRows();
+      }
+    });
+    this.filterBtn = this.toolsEl.createEl("button", { cls: "sw-playlist-filter" });
+    this.filterBtn.setAttribute("aria-label", t("filterTitle"));
+    this.filterBtn.addEventListener("click", () => this.onFilterClick());
+    this.progressEl = this.toolsEl.createSpan({ cls: "sw-playlist-progress" });
+
     this.playlistList = this.playlistEl.createDiv({ cls: "sw-playlist-list" });
+    this.noneEl = this.playlistEl.createDiv({ cls: "sw-playlist-none", text: t("playlistNone") });
+    this.noneEl.hide();
+  }
+
+  private static readonly FILTER_LABEL: Record<PlaylistFilter,
+    "filterAll" | "filterUnsorted" | "filterUsed" | "filterSaved" | "filterDropped"> = {
+    all: "filterAll", unsorted: "filterUnsorted", used: "filterUsed", saved: "filterSaved", dropped: "filterDropped"
+  };
+
+  private onFilterClick() {
+    const menu = new Menu();
+    const current = this.plugin.settings.playlistFilter;
+    for (const filter of ["all", "unsorted", ...VERDICTS] as PlaylistFilter[]) {
+      menu.addItem((item) => item
+        .setTitle(t(SongwriterView.FILTER_LABEL[filter]))
+        .setChecked(current === filter)
+        .onClick(() => {
+          this.plugin.settings.playlistFilter = filter;
+          this.plugin.requestSave();
+          this.refillPlaylistRows();
+        }));
+    }
+    // dropped tracks can go for good, from the same place they are filtered
+    const dropped = this.engine.queue.filter(f => this.plugin.settings.tracks[f.path]?.verdict === "dropped");
+    if (dropped.length > 0) {
+      menu.addSeparator();
+      menu.addItem((item) => item
+        .setTitle(t("trashDropped")(dropped.length))
+        .setIcon("trash-2")
+        .setWarning(true)
+        .onClick(() => this.plugin.confirmTrash(dropped)));
+    }
+    const rect = this.filterBtn.getBoundingClientRect();
+    menu.showAtPosition({ x: rect.left, y: rect.bottom + 4 });
   }
 
   private applyPlaylistCollapsed() {
     const collapsed = this.plugin.settings.playlistCollapsed;
     this.playlistList.toggle(!collapsed);
+    this.toolsEl.toggle(!collapsed);
+    this.updateSortingTools(); // the "nothing matches" line follows the fold
     // the chevron says this visually; aria-expanded says it to everyone else
     this.playlistEl.querySelector(".sw-playlist-head")
       ?.setAttribute("aria-expanded", String(!collapsed));
@@ -641,6 +717,7 @@ export class SongwriterView extends ItemView {
       this.renderedPaths = paths;
     }
     this.updatePlaylistCurrent();
+    this.updateSortingTools();
   }
 
   // ---- playlist order ----
@@ -687,11 +764,21 @@ export class SongwriterView extends ItemView {
       const row = this.playlistList.createDiv({ cls: "sw-pl-row" });
       row.setAttribute("role", "button");
       const num = row.createSpan({ cls: "sw-pl-num", text: String(index + 1) });
+      // sorting a pack: each click steps this track's mark on, right in the
+      // list — the row itself still plays, so the click stops here
+      const verdict = row.createSpan({ cls: "sw-pl-verdict" });
+      verdict.setAttribute("role", "button");
+      verdict.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.plugin.setVerdict(f.path, nextVerdict(this.plugin.settings.tracks[f.path]?.verdict));
+      });
+      // no file read for a drag that is not going to start here
+      verdict.addEventListener("mousedown", (e) => e.stopPropagation());
       row.createSpan({ cls: "sw-pl-name", text: f.basename, title: `${f.path}\n${t("rowDragHint")}` });
       const flag = row.createSpan({ cls: "sw-pl-flag" });
       const musical = row.createSpan({ cls: "sw-pl-musical" });
       const plays = row.createSpan({ cls: "sw-pl-plays" });
-      this.playlistRows.set(f.path, { row, num, index, flag, plays, musical });
+      this.playlistRows.set(f.path, { row, num, index, name: f.basename, verdict, flag, plays, musical });
       this.fillPlaylistRow(f.path);
       row.addEventListener("click", () => {
         if (f.path === this.engine.file?.path) void this.engine.playPause();
@@ -700,6 +787,29 @@ export class SongwriterView extends ItemView {
       row.addEventListener("contextmenu", (e) => {
         e.preventDefault();
         const menu = new Menu();
+        // a mark from here lands on this row only — nothing starts playing
+        const current = this.plugin.settings.tracks[f.path]?.verdict;
+        for (const verdict of VERDICTS) {
+          menu.addItem((item) => item
+            .setTitle(t(VERDICT_UI[verdict].label))
+            .setIcon(VERDICT_UI[verdict].icon)
+            .setChecked(current === verdict)
+            .onClick(() => this.plugin.setVerdict(f.path, verdict)));
+        }
+        if (current) {
+          menu.addItem((item) => item
+            .setTitle(t("menuClearVerdict"))
+            .setIcon("eraser")
+            .onClick(() => this.plugin.setVerdict(f.path, undefined)));
+        }
+        if (current === "dropped") {
+          menu.addItem((item) => item
+            .setTitle(t("trashOne"))
+            .setIcon("trash-2")
+            .setWarning(true)
+            .onClick(() => this.plugin.confirmTrash([f])));
+        }
+        menu.addSeparator();
         menu.addItem((item) => item
           .setTitle(t("copyToNote"))
           .setIcon("copy")
@@ -849,7 +959,48 @@ export class SongwriterView extends ItemView {
     els.plays.setText(data?.plays ? `▶ ${data.plays}` : "");
     const key = formatKey(data?.key, data?.scale);
     els.musical.setText(data?.bpm != null ? (key ? `${data.bpm} ${key}` : String(data.bpm)) : "");
+
+    const verdict = data?.verdict;
+    for (const v of VERDICTS) els.row.toggleClass(`is-${v}`, verdict === v);
+    // a new track shows an empty circle: the spot is there to click before
+    // anything has been decided
+    els.verdict.empty();
+    setIcon(els.verdict, verdict ? VERDICT_UI[verdict].icon : "circle");
+    els.verdict.setAttribute("aria-label",
+      t("verdictRowLabel")(t(verdict ? VERDICT_UI[verdict].label : "verdictNew")));
+    els.row.toggle(rowVisible(els.name, verdict, this.plugin.settings.playlistFilter, this.query));
   }
+
+  /** Every row, then the counters and the "nothing matches" line that depend on them. */
+  private refillPlaylistRows() {
+    for (const path of this.playlistRows.keys()) this.fillPlaylistRow(path);
+    this.updateSortingTools();
+  }
+
+  /** The filter's label, how far the sorting has got, and whether anything is left to show. */
+  private updateSortingTools() {
+    if (!this.filterBtn) return;
+    const filter = this.plugin.settings.playlistFilter;
+    this.filterBtn.setText(t(SongwriterView.FILTER_LABEL[filter]));
+    this.filterBtn.toggleClass("is-active", filter !== "all");
+
+    const count: Record<Verdict, number> = { used: 0, saved: 0, dropped: 0 };
+    let shown = 0;
+    for (const [path, els] of this.playlistRows) {
+      const verdict = this.plugin.settings.tracks[path]?.verdict;
+      if (verdict) count[verdict]++;
+      if (rowVisible(els.name, verdict, filter, this.query)) shown++;
+    }
+    const total = this.playlistRows.size;
+    const sorted = count.used + count.saved + count.dropped;
+    // nothing judged yet: no counter, the list looks the way it always did
+    this.progressEl.toggle(sorted > 0);
+    this.progressEl.setText(`${sorted}/${total}`);
+    this.progressEl.title = t("progressTitle")(sorted, total, count.used, count.saved, count.dropped);
+    this.noneEl.toggle(total > 0 && shown === 0 && !this.plugin.settings.playlistCollapsed);
+  }
+
+
 
   /** The clear-marker button exists only while the track actually has one. */
   private updateMarkerBtn() {
@@ -857,11 +1008,6 @@ export class SongwriterView extends ItemView {
     const path = this.engine.file?.path;
     const marker = path ? this.plugin.settings.tracks[path]?.marker : null;
     this.markerBtn.toggle(marker !== null && marker !== undefined);
-  }
-
-  private updatePlaylistRow() {
-    const path = this.engine.file?.path;
-    if (path) this.fillPlaylistRow(path);
   }
 
   private updatePlayButton() {

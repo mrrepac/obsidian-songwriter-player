@@ -1,11 +1,12 @@
 import { App, Hotkey, MarkdownView, Notice, Plugin, TFile, WorkspaceLeaf, normalizePath } from "obsidian";
 import { DEFAULT_SETTINGS, QueueSource, SongwriterSettings, TrackData, emptyTrackData, isAudioPath } from "./types";
-import { sortTracks } from "./playlist";
+import { Verdict, isVerdict, nextVerdict, sortTracks } from "./playlist";
 import { analyseMusical, foldIntoWindow } from "./musical";
 import { renderTransposed, renderedName } from "./render";
 import { t } from "./i18n";
 import { openExternally, revealInExplorer } from "./external";
 import { copyTrackToNote as copyIntoNote } from "./copy";
+import { ConfirmModal } from "./confirm";
 import { EmbedPlayers } from "./embed";
 import { decidePickup } from "./pickup";
 import { PlayerEngine } from "./engine";
@@ -299,7 +300,15 @@ export default class SongwriterPlugin extends Plugin {
       callback: () => this.openTrackNote()
     });
 
-    // no default hotkey: the built-in key table is already at fourteen commands
+    // no default hotkey: sorting a pack is occasional, and the free Alt
+    // letters are spoken for — bind it in Obsidian's hotkey settings if wanted
+    this.addCommand({
+      id: "cycle-verdict",
+      name: "Cycle the track's mark: new, used, saved, dropped",
+      callback: () => this.cycleVerdict()
+    });
+
+    // no default hotkey: the built-in key table is already long enough
     this.addCommand({
       id: "copy-track-to-note",
       name: "Copy track to current note",
@@ -655,6 +664,59 @@ export default class SongwriterPlugin extends Plugin {
     this.engine.trigger("data-changed");
   }
 
+  // ---- sorting a folder ----
+
+  /** Set or clear one track's verdict, without touching playback. */
+  setVerdict(path: string, verdict: Verdict | undefined) {
+    const d = this.trackData(path);
+    if (d.verdict === verdict) return;
+    d.verdict = verdict;
+    this.requestSave();
+    this.engine.trigger("data-changed");
+  }
+
+  /** Step the loaded track's mark one place on: new → used → saved → dropped → new. */
+  cycleVerdict() {
+    const file = this.engine.file;
+    if (!file) {
+      new Notice(t("noTrack"));
+      return;
+    }
+    this.setVerdict(file.path, nextVerdict(this.settings.tracks[file.path]?.verdict));
+  }
+
+  /**
+   * Send tracks to the trash — the one the user chose in Obsidian, system or
+   * .trash — after asking. The question says how many of them a note still
+   * links to, since those links break. The vault's delete event then clears
+   * their records, the playlist and the player, as for any other deletion.
+   */
+  confirmTrash(files: TFile[]) {
+    if (files.length === 0) return;
+    const targets = new Set(files.map(f => f.path));
+    const linked = new Set<string>();
+    for (const links of Object.values(this.app.metadataCache.resolvedLinks)) {
+      for (const path of Object.keys(links)) if (targets.has(path)) linked.add(path);
+    }
+    const heading = files.length === 1 ? t("trashOneTitle")(files[0].basename) : t("trashManyTitle")(files.length);
+    new ConfirmModal(this.app, heading, t("trashConfirmText")(files.length, linked.size), t("trashConfirmBtn"),
+      () => void this.trashTracks(files)).open();
+  }
+
+  private async trashTracks(files: TFile[]) {
+    let done = 0;
+    for (const file of files) {
+      try {
+        await this.app.fileManager.trashFile(file);
+        done++;
+      } catch (e) {
+        console.error("Songwriter: could not delete", file.path, e);
+      }
+    }
+    if (done < files.length) new Notice(t("trashFailed")(files.length - done));
+    if (done > 0) new Notice(t("trashDone")(done), 3000);
+  }
+
   /** Jump back to the note the current track was picked up from. */
   async openTrackNote() {
     const file = this.engine.file;
@@ -818,7 +880,8 @@ export default class SongwriterPlugin extends Plugin {
         // learning stays slow, a song stays in the key you sing it in — so they
         // have to be restored here, not just written
         rate: restoreRate(raw.rate),
-        semitones: restoreSemitones(raw.semitones)
+        semitones: restoreSemitones(raw.semitones),
+        verdict: isVerdict(raw.verdict) ? raw.verdict : undefined
       };
     }
     this.refoldTempos();
@@ -873,7 +936,8 @@ export default class SongwriterPlugin extends Plugin {
       // so does a chosen speed or key: they are the whole point of the record
       // for a track being practised, even before it has a marker or a play
       const noPlayback = d.rate === undefined && d.semitones === undefined;
-      if (d.marker === null && noStats && noMusical && noPlayback) {
+      // and a verdict is the whole result of sorting a pack
+      if (d.marker === null && noStats && noMusical && noPlayback && d.verdict === undefined) {
         delete this.settings.tracks[path];
       }
     }

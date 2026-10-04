@@ -613,6 +613,101 @@ body.sw-hide-embed-buttons .sw-embed-ext {
   height: 11px;
 }
 
+/* ---- sorting a pack: verdicts, search, filter ---- */
+
+/* right after the number: each click steps the track's mark on */
+.sw-pl-verdict {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin: -2px 0;
+  border-radius: var(--radius-s);
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.sw-pl-verdict svg {
+  width: 13px;
+  height: 13px;
+}
+
+.sw-pl-verdict:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* a new track: the empty circle only marks the spot, it should not shout */
+.sw-pl-row:not(.is-used):not(.is-saved):not(.is-dropped) .sw-pl-verdict svg {
+  opacity: 0.45;
+}
+
+.sw-pl-row.is-used .sw-pl-verdict {
+  color: var(--color-green);
+}
+
+.sw-pl-row.is-saved .sw-pl-verdict {
+  color: var(--interactive-accent);
+}
+
+/* dropped: still there to change your mind about, but out of the way */
+.sw-pl-row.is-dropped {
+  opacity: 0.45;
+}
+
+.sw-pl-row.is-dropped .sw-pl-verdict {
+  color: var(--text-faint);
+}
+
+.sw-pl-row.is-dropped.is-current,
+.sw-pl-row.is-dropped:hover {
+  opacity: 0.8;
+}
+
+.sw-playlist-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 4px 2px;
+  flex-shrink: 0;
+}
+
+.sw-playlist-search {
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  padding: 0 6px;
+  font-size: var(--font-ui-smaller);
+}
+
+.sw-playlist-filter {
+  flex-shrink: 0;
+  height: 24px;
+  padding: 0 8px;
+  font-size: var(--font-ui-smaller);
+}
+
+.sw-playlist-filter.is-active {
+  color: var(--interactive-accent);
+}
+
+.sw-playlist-progress {
+  flex-shrink: 0;
+  font-size: var(--font-ui-smaller);
+  font-family: var(--font-monospace);
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.sw-playlist-none {
+  padding: 8px 4px;
+  text-align: center;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+}
+
 .sw-rate {
   flex-shrink: 0;
   padding: 1px 6px;

@@ -1,4 +1,18 @@
-import { PlaylistSort } from "./types";
+import type { PlaylistFilter, PlaylistSort } from "./types";
+
+/**
+ * Sorting a pack of beats: a track went into a song, was saved for later, or
+ * was dropped. Separate from the marker on purpose — the marker says where to
+ * play from, not what became of the track.
+ */
+export type Verdict = "used" | "saved" | "dropped";
+
+/** The order one button steps through; undefined is "new", not sorted yet. */
+export const VERDICTS: Verdict[] = ["used", "saved", "dropped"];
+
+export function isVerdict(value: unknown): value is Verdict {
+  return VERDICTS.includes(value as Verdict);
+}
 
 export interface SortableTrack {
   path: string;
@@ -29,4 +43,24 @@ export function sortTracks<T extends SortableTrack>(files: T[], sort: PlaylistSo
     default:
       return out.sort(byName);
   }
+}
+
+/** One click on the button: new → used → saved → dropped → new again. */
+export function nextVerdict(verdict: Verdict | undefined): Verdict | undefined {
+  if (!verdict) return VERDICTS[0];
+  const i = VERDICTS.indexOf(verdict);
+  return i < 0 ? VERDICTS[0] : VERDICTS[i + 1];
+}
+
+/**
+ * Whether a playlist row is shown: it has to pass the filter and match every
+ * word of the search, in any order and any case.
+ */
+export function rowVisible(name: string, verdict: Verdict | undefined, filter: PlaylistFilter, query: string): boolean {
+  if (filter === "unsorted" && verdict) return false;
+  if (filter !== "all" && filter !== "unsorted" && verdict !== filter) return false;
+  const words = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return true;
+  const hay = name.toLocaleLowerCase().replace(/ё/g, "е");
+  return words.every(w => hay.includes(w.replace(/ё/g, "е")));
 }

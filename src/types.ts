@@ -20,7 +20,13 @@ export interface TrackData {
   rate?: number;
   /** transposition in semitones, desktop only; undefined = as recorded */
   semitones?: number;
+  /** the verdict from sorting a folder; undefined = not sorted yet */
+  verdict?: Verdict;
 }
+
+// Lives in playlist.ts, which has to stay free of Obsidian so it can be tested bare.
+import type { Verdict } from "./playlist";
+export type { Verdict };
 
 export function emptyTrackData(): TrackData {
   return {
@@ -34,6 +40,9 @@ export type PickupMode = "hybrid" | "auto" | "manual";
 
 /** How a folder playlist is ordered. A note playlist ignores this — it keeps the author's order. */
 export type PlaylistSort = "name" | "tempo" | "plays" | "recent";
+
+/** Which rows the playlist shows; walking it with ⏮ ⏭ still covers every track. */
+export type PlaylistFilter = "all" | "unsorted" | Verdict;
 
 /** Mobile floating-button tap behavior. */
 export type FabMode = "marker" | "smart";
@@ -66,6 +75,7 @@ export interface SongwriterSettings {
   playlistCollapsed: boolean;
   /** order of a folder playlist; a note playlist always keeps the note's own order */
   playlistSort: PlaylistSort;
+  playlistFilter: PlaylistFilter;
   autoAnalyse: boolean;
   /** lower edge of the preferred tempo octave: 80 means 80…159 */
   tempoWindowLow: number;
@@ -92,6 +102,7 @@ export const DEFAULT_SETTINGS: SongwriterSettings = {
   autoAdvance: false,
   playlistCollapsed: false,
   playlistSort: "name",
+  playlistFilter: "all",
   autoAnalyse: true,
   tempoWindowLow: 80,
   tracks: {}

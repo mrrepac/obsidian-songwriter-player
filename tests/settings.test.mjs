@@ -173,6 +173,23 @@ export default async function run() {
     s.check("and so is the switch that gated zones", () => saved.loopZones === undefined);
   }
 
+  // ---- sorting a pack: verdicts survive a restart ----
+  {
+    const { saved } = await roundTrip({
+      playlistFilter: "unsorted",
+      tracks: {
+        "used.mp3": track({ verdict: "used" }),
+        "saved.mp3": track({ verdict: "saved" }),
+        "dropped.mp3": track({ verdict: "dropped" }),
+        "nonsense.mp3": track({ verdict: "maybe", plays: 1 })
+      }
+    });
+    s.check("a mark alone keeps a record", () => saved.tracks["used.mp3"].verdict === "used"
+      && saved.tracks["saved.mp3"].verdict === "saved" && saved.tracks["dropped.mp3"].verdict === "dropped");
+    s.check("a mark that is not one is not kept", () => saved.tracks["nonsense.mp3"].verdict === undefined);
+    s.check("the playlist filter is remembered", () => saved.playlistFilter === "unsorted");
+  }
+
   // ---- keys this version does not know ----
   // The real data.json carried `autoAnalyze` (a "z") next to the live
   // `autoAnalyse` for months, because a load used to pass everything through.

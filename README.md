@@ -41,6 +41,18 @@ not in the UI).
   tempo, play count or how recently the file changed; the chosen order is what
   `⏮ ⏭` walk, and it is remembered. Folder playlists only: a playlist built from
   a note keeps the order the note itself gives it.
+- **Sort a pack of beats** — right after its number every playlist row has a
+  small button, and each click steps the track's mark on: new (an empty circle)
+  → in a track (a note) → saved (a bookmark) → dropped (a cross, the row fades)
+  → new again. Clicking it does not play anything. A row's right-click menu sets
+  any mark directly. Under the playlist header a search box narrows the list by
+  name (every word, any order), a filter shows all tracks, new ones or one mark,
+  and a counter says how far the sorting has got (`34/97`). Dropped tracks can
+  go for good: one from its row's menu, all of them from the filter menu — after
+  a confirmation that also says how many of them notes still link to. They go to
+  the trash set in Obsidian's Files and links settings. There is also a command
+  that steps the loaded track's mark, without a default key. Marks are separate
+  from the marker and are remembered per file.
 - **Copy a track into the note you are looking at** — the `Copy track to current
   note` command, or the same item in a playlist row's right-click menu. The copy
   lands in the vault's own attachment folder and is embedded in the note as a
@@ -106,7 +118,7 @@ embedded-player button.
 
 ## Data
 
-Markers and counters are stored in the plugin's `data.json`, keyed by the
+Markers, counters and sorting marks are stored in the plugin's `data.json`, keyed by the
 audio file path; when a file is renamed inside the vault, its data moves along
 automatically.
 
