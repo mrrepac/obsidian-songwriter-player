@@ -629,7 +629,7 @@ export default class SongwriterPlugin extends Plugin {
   /**
    * A hand correction, or a measurement by the current detectors, means there
    * is nothing to measure. bpmRaw is what tells the current ones apart: only
-   * 1.10.0 writes it, so a track measured by essentia — or by the first
+   * 2.0.0 writes it, so a track measured by essentia — or by the first
    * TempoCNN builds, which kept no raw tempo to re-round — counts as
    * unmeasured. The batch button picks it up again, while its old tempo and
    * key stay on show until the new ones arrive.

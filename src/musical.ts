@@ -9,7 +9,7 @@ declare const ANALYSIS_WORKER_SOURCE: string;
 /**
  * Tempo by TempoCNN, key by S-KEY — both ported from the originals and held to
  * them by tests/detect.test.mjs. They replaced essentia (RhythmExtractor2013
- * and five voting key profiles) in 1.10.0.
+ * and five voting key profiles) in 2.0.0.
  */
 export interface MusicalData {
   /** displayed tempo, folded into the preferred octave and rounded */

@@ -514,7 +514,7 @@ export class SongwriterView extends ItemView {
     }
     const key = formatKey(d.key, d.scale);
     el.setText(key ? `${d.bpm} · ${key}` : String(d.bpm));
-    // tracks measured before 1.10.0 carry essentia's profile votes instead
+    // tracks measured before 2.0.0 carry essentia's profile votes instead
     const votes = d.keyStrength !== undefined
       ? t("keyCertainty")(Math.round(d.keyStrength * 100), d.scaleAlt ? formatKey(d.key, d.scaleAlt) : null)
       : d.scaleAlt

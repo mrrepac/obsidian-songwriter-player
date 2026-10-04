@@ -6,7 +6,7 @@ export interface TrackData {
   playedSec: number;
   /** measured tempo, rounded; null until the track has been analysed */
   bpm?: number | null;
-  /** the detector's tempo before folding and rounding; 1.10.0 measurements only */
+  /** the detector's tempo before folding and rounding; 2.0.0 measurements only */
   bpmRaw?: number;
   /** tonic, e.g. "F#" */
   key?: string | null;
@@ -15,7 +15,7 @@ export interface TrackData {
   /** the other mode of the same tonic, when the detector was torn between them */
   scaleAlt?: string | null;
   /** how many of essentia's five key profiles backed the winner — tracks
-   *  measured before 1.10.0 only; S-KEY writes keyStrength instead */
+   *  measured before 2.0.0 only; S-KEY writes keyStrength instead */
   keyVotes?: number;
   /** S-KEY's probability for the winning key, 0…1 */
   keyStrength?: number;
