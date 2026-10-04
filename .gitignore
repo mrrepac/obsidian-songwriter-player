@@ -12,3 +12,4 @@ Thumbs.db
 
 # Scratch for the plan-execution workflow (ledger, briefs, review packages)
 .superpowers/
+tools/fixtures/
