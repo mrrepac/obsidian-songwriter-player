@@ -535,11 +535,11 @@ export class SongwriterView extends ItemView {
     menu.addItem((item) => item
       .setTitle(t("menuDouble"))
       .setIcon("chevrons-up")
-      .onClick(() => this.plugin.editMusical(file.path, { bpm: Math.round(d.bpm! * 2) })));
+      .onClick(() => this.plugin.editMusical(file.path, { bpm: Math.round(d.bpm! * 20) / 10 })));
     menu.addItem((item) => item
       .setTitle(t("menuHalf"))
       .setIcon("chevrons-down")
-      .onClick(() => this.plugin.editMusical(file.path, { bpm: Math.round(d.bpm! / 2) })));
+      .onClick(() => this.plugin.editMusical(file.path, { bpm: Math.round(d.bpm! * 5) / 10 })));
 
     if (d.key) {
       // the runner-up mode when the detector was torn, the opposite one otherwise

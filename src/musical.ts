@@ -14,6 +14,9 @@ declare const ANALYSIS_WORKER_SOURCE: string;
 export interface MusicalData {
   /** displayed tempo, folded into the preferred octave and rounded */
   bpm: number;
+  /** the detector's own value, unfolded and unrounded: re-folding and any
+   *  later change of the rounding rule start from this, not from bpm */
+  bpmRaw: number;
   key: string;
   scale: string;
   /** the other mode of the same tonic when S-KEY ranks it second */
@@ -25,13 +28,20 @@ export interface MusicalData {
 /**
  * The network picks a metric level, but which octave a beat "really" is in is
  * a matter of feel, so the preferred window decides; ×2 and ÷2 on the badge
- * override it per track. Production tempos are practically always whole
- * numbers, so a value close to one is snapped to it.
+ * override it per track.
+ *
+ * Shown to a tenth, snapped to the whole number within 0.1. TempoCNN's comb
+ * refinement lands within 0.01 of a whole tempo on every straight beat it was
+ * checked on (77.000, 85.999, 88.000, 160.002), so a larger offset is real: a
+ * beat VirtualDJ reads as 89.31 comes out 89.306 here, and the old snap to
+ * the nearest whole number within 0.35 — written for essentia, which drifted
+ * to 161.76 on a track at 160 — showed it as 89.
  */
-function resolveTempo(raw: number, windowLow: number): number {
+export function resolveTempo(raw: number, windowLow: number): number {
   if (!isFinite(raw) || raw <= 0) return 0;
-  const bpm = Math.round(foldIntoWindow(raw, windowLow) * 100) / 100;
-  return Math.abs(bpm - Math.round(bpm)) < 0.35 ? Math.round(bpm) : bpm;
+  const folded = foldIntoWindow(raw, windowLow);
+  const whole = Math.round(folded);
+  return Math.abs(folded - whole) < 0.1 ? whole : Math.round(folded * 10) / 10;
 }
 
 /**
@@ -107,6 +117,7 @@ export async function analyseMusical(app: App, file: TFile, tempoWindowLow: numb
   }
   return {
     bpm: resolveTempo(tempo.bpm, tempoWindowLow),
+    bpmRaw: tempo.bpm,
     key: key.key,
     scale: key.scale,
     scaleAlt: key.scaleAlt ?? null,

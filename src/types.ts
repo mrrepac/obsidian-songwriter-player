@@ -6,6 +6,8 @@ export interface TrackData {
   playedSec: number;
   /** measured tempo, rounded; null until the track has been analysed */
   bpm?: number | null;
+  /** the detector's tempo before folding and rounding; 1.10.0 measurements only */
+  bpmRaw?: number;
   /** tonic, e.g. "F#" */
   key?: string | null;
   /** "major" | "minor" */

@@ -98,7 +98,8 @@ export default async function run() {
   {
     const data = {
       tracks: {
-        "new.mp3": track({ bpm: 120, key: "Eb", scale: "minor", keyStrength: 0.73 }),
+        "new.mp3": track({ bpm: 89.3, bpmRaw: 89.306, key: "B", scale: "minor", keyStrength: 0.61 }),
+        "early.mp3": track({ bpm: 89, key: "B", scale: "minor", keyStrength: 0.61 }),
         "old.mp3": track({ bpm: 154, key: "C", scale: "minor", scaleAlt: null, keyVotes: 5 }),
         "hand.mp3": track({ bpm: 154, key: "C", scale: "minor", keyVotes: 5, musicalEdited: true }),
         "none.mp3": track({ plays: 3 })
@@ -106,13 +107,15 @@ export default async function run() {
     };
     const { saved } = await roundTrip(data);
     s.check("the current detectors' certainty survives a restart",
-      () => saved.tracks["new.mp3"].keyStrength === 0.73);
+      () => saved.tracks["new.mp3"].keyStrength === 0.61);
+    s.check("so does the detector's own tempo", () => saved.tracks["new.mp3"].bpmRaw === 89.306);
     // load what was just saved, as the next start would
     const plugin = makePlugin();
     files = { [DATA]: JSON.stringify(saved) };
     await plugin.loadSettings();
     s.check("a current measurement is not measured again", () => plugin.isMeasured("new.mp3"));
     s.check("an essentia measurement is measured again", () => !plugin.isMeasured("old.mp3"));
+    s.check("so is one from a build that kept no raw tempo", () => !plugin.isMeasured("early.mp3"));
     s.check("while its old tempo stays on show", () => plugin.settings.tracks["old.mp3"].bpm === 154);
     s.check("a hand correction is never measured again", () => plugin.isMeasured("hand.mp3"));
     s.check("an unmeasured track is measured", () => !plugin.isMeasured("none.mp3"));
@@ -248,6 +251,24 @@ export default async function run() {
     plugin.refoldTempos();
     s.check("and back, without drifting", () => plugin.settings.tracks["fast.mp3"].bpm === 80);
     s.check("a hand correction still stays put", () => plugin.settings.tracks["by-hand.mp3"].bpm === 160);
+  }
+  // ---- a fractional tempo re-folds from the detector's value ----
+  {
+    stored = null;
+    files = { [DATA]: JSON.stringify({
+      tempoWindowLow: 80,
+      tracks: { "odd.mp3": track({ bpm: 89.3, bpmRaw: 89.306, keyStrength: 0.6, plays: 1 }) }
+    }) };
+    const plugin = makePlugin();
+    await plugin.loadSettings();
+    const bpm = () => plugin.settings.tracks["odd.mp3"].bpm;
+    s.check("a fractional tempo survives loading", () => bpm() === 89.3, `got ${bpm()}`);
+    plugin.settings.tempoWindowLow = 100;
+    plugin.refoldTempos();
+    s.check("and doubles into a higher window to a tenth", () => bpm() === 178.6, `got ${bpm()}`);
+    plugin.settings.tempoWindowLow = 80;
+    plugin.refoldTempos();
+    s.check("and comes back exactly", () => bpm() === 89.3, `got ${bpm()}`);
   }
 
   // ---- defaults ----

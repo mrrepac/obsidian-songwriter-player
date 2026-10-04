@@ -1,7 +1,7 @@
 import { App, Hotkey, MarkdownView, Notice, Plugin, TFile, WorkspaceLeaf, normalizePath } from "obsidian";
 import { DEFAULT_SETTINGS, QueueSource, SongwriterSettings, TrackData, emptyTrackData, isAudioPath } from "./types";
 import { Verdict, isVerdict, nextVerdict, sortTracks } from "./playlist";
-import { analyseMusical, foldIntoWindow } from "./musical";
+import { analyseMusical, foldIntoWindow, resolveTempo } from "./musical";
 import { renderTransposed, renderedName } from "./render";
 import { t } from "./i18n";
 import { openExternally, revealInExplorer } from "./external";
@@ -607,6 +607,7 @@ export default class SongwriterPlugin extends Plugin {
       if (this.app.vault.getAbstractFileByPath(file.path) !== file) return "skipped";
       const d = this.trackData(file.path);
       d.bpm = result.bpm;
+      d.bpmRaw = result.bpmRaw;
       d.key = result.key;
       d.scale = result.scale;
       d.scaleAlt = result.scaleAlt;
@@ -627,14 +628,15 @@ export default class SongwriterPlugin extends Plugin {
 
   /**
    * A hand correction, or a measurement by the current detectors, means there
-   * is nothing to measure. keyStrength is what tells the current ones apart:
-   * only TempoCNN and S-KEY write it, so a track measured by essentia before
-   * 1.10.0 counts as unmeasured — the batch button picks it up again, while
-   * its old tempo and key stay on show until the new ones arrive.
+   * is nothing to measure. bpmRaw is what tells the current ones apart: only
+   * 1.10.0 writes it, so a track measured by essentia — or by the first
+   * TempoCNN builds, which kept no raw tempo to re-round — counts as
+   * unmeasured. The batch button picks it up again, while its old tempo and
+   * key stay on show until the new ones arrive.
    */
   isMeasured(path: string): boolean {
     const d = this.settings.tracks[path];
-    return !!d?.musicalEdited || (d?.bpm != null && d.keyStrength !== undefined);
+    return !!d?.musicalEdited || (d?.bpm != null && d.bpmRaw !== undefined);
   }
 
   /** The batch in flight, if any; its flag is how a second click stops it. */
@@ -729,6 +731,7 @@ export default class SongwriterPlugin extends Plugin {
     const d = this.settings.tracks[path];
     if (!d) return;
     d.bpm = null;
+    d.bpmRaw = undefined;
     d.key = null;
     d.scale = null;
     d.scaleAlt = null;
@@ -946,6 +949,7 @@ export default class SongwriterPlugin extends Plugin {
         plays: typeof raw.plays === "number" ? raw.plays : 0,
         playedSec: typeof raw.playedSec === "number" ? raw.playedSec : 0,
         bpm: raw.bpm ?? null,
+        bpmRaw: typeof raw.bpmRaw === "number" ? raw.bpmRaw : undefined,
         key: raw.key ?? null,
         scale: raw.scale ?? null,
         scaleAlt: raw.scaleAlt ?? null,
@@ -970,9 +974,12 @@ export default class SongwriterPlugin extends Plugin {
    */
   refoldTempos() {
     for (const d of Object.values(this.settings.tracks)) {
-      if (d.bpm != null && !d.musicalEdited) {
-        d.bpm = Math.round(foldIntoWindow(d.bpm, this.settings.tempoWindowLow));
-      }
+      if (d.bpm == null || d.musicalEdited) continue;
+      // from the detector's own value when there is one, so the rounding
+      // never compounds; older records only ever held whole numbers
+      d.bpm = d.bpmRaw !== undefined
+        ? resolveTempo(d.bpmRaw, this.settings.tempoWindowLow)
+        : Math.round(foldIntoWindow(d.bpm, this.settings.tempoWindowLow));
     }
   }
 

@@ -42,5 +42,13 @@ export default async function run() {
   s.check("the D minor progression reads as D minor", () => key.key === "D" && key.scale === "minor",
     `got ${key.key} ${key.scale}`);
 
+  // the rounding rule, on values the detector really gave
+  const { resolveTempo } = load(await bundle("src/musical.ts", { ANALYSIS_WORKER_SOURCE: '""' }),
+    { modules: { obsidian: {} } });
+  s.check("a straight beat is shown whole", () => resolveTempo(160.002, 100) === 160 && resolveTempo(85.999, 80) === 86);
+  s.check("a beat off the grid keeps its tenth", () => resolveTempo(89.306, 80) === 89.3,
+    `got ${resolveTempo(89.306, 80)}`);
+  s.check("folding comes before rounding", () => resolveTempo(77.0, 80) === 154);
+
   return s.report();
 }
