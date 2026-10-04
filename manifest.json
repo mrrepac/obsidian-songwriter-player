@@ -3,7 +3,7 @@
   "name": "Songwriter Player",
   "version": "1.9.0",
   "minAppVersion": "1.7.2",
-  "description": "Advanced audio player for songwriting: waveform, work marker, play counters, tempo and key, sorting a pack of beats and hotkeys — in the sidebar, or replacing the plain player inline in your notes. Playback survives note scrolling and closing the panel.",
+  "description": "Advanced audio player for songwriting: waveform, work marker, play counters, tempo and key, sorting a pack of beats and hotkeys — in the sidebar, or replacing the player inline in your notes. Playback survives note scrolling and closing the panel.",
   "author": "mrrepac",
   "authorUrl": "https://github.com/mrrepac",
   "isDesktopOnly": false
