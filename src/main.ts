@@ -625,10 +625,16 @@ export default class SongwriterPlugin extends Plugin {
     }
   }
 
-  /** A stored tempo, or a hand correction, means there is nothing to measure. */
+  /**
+   * A hand correction, or a measurement by the current detectors, means there
+   * is nothing to measure. keyStrength is what tells the current ones apart:
+   * only TempoCNN and S-KEY write it, so a track measured by essentia before
+   * 1.10.0 counts as unmeasured — the batch button picks it up again, while
+   * its old tempo and key stay on show until the new ones arrive.
+   */
   isMeasured(path: string): boolean {
     const d = this.settings.tracks[path];
-    return !!d?.musicalEdited || d?.bpm != null;
+    return !!d?.musicalEdited || (d?.bpm != null && d.keyStrength !== undefined);
   }
 
   /** The batch in flight, if any; its flag is how a second click stops it. */
@@ -640,7 +646,7 @@ export default class SongwriterPlugin extends Plugin {
 
   /**
    * Measure every track in the list that has no tempo yet — a freshly dropped
-   * pack of beats, typically. One at a time, on purpose: each measurement
+   * pack of beats, typically — or only essentia's (see isMeasured). One at a time, on purpose: each measurement
    * decodes a whole file, and running them side by side would only stack up
    * that memory. Asked again while it runs, it stops after the current track.
    */

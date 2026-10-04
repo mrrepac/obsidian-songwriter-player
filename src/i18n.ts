@@ -68,9 +68,9 @@ const en = {
   verdictDropped: "Dropped",
   verdictRowLabel: (state: string) =>
     `${state}. Click for the next mark: new → in a track → saved → dropped. With the player panel focused: A in a track, S saved, D dropped, F new; ↑ ↓ walk the list, ← → seek`,
-  measureAllTitle: (n: number) => `Measure tempo and key of ${n} unmeasured ${n === 1 ? "track" : "tracks"}`,
+  measureAllTitle: (n: number) => `Measure tempo and key of ${n} ${n === 1 ? "track" : "tracks"} not yet measured by the current detectors`,
   measureStopTitle: "Stop measuring after the current track",
-  batchNothing: "Songwriter: every track in the playlist already has its tempo",
+  batchNothing: "Songwriter: every track in the playlist is already measured",
   batchProgress: (i: number, n: number) => `Songwriter: measuring tempo and key — ${i} of ${n}`,
   batchDone: (measured: number, failed: number) =>
     `Songwriter: measured ${measured}` + (failed > 0 ? `, ${failed} could not be read` : ""),
@@ -255,9 +255,9 @@ const ru: typeof en = {
   verdictDropped: "Дроп",
   verdictRowLabel: (state: string) =>
     `${state}. Клик — следующая отметка: новый → в треке → сохранён → дроп. Когда фокус в панели плеера: A — в треке, S — сохранён, D — дроп, F — новый; ↑ ↓ — по списку, ← → — перемотка`,
-  measureAllTitle: (n: number) => `Измерить темп и тональность у неизмеренных: ${n}`,
+  measureAllTitle: (n: number) => `Измерить темп и тональность у неизмеренных и измеренных старым способом: ${n}`,
   measureStopTitle: "Остановить замер после текущего трека",
-  batchNothing: "Songwriter: у всех треков плейлиста темп уже есть",
+  batchNothing: "Songwriter: все треки плейлиста уже измерены",
   batchProgress: (i: number, n: number) => `Songwriter: измеряю темп и тональность — ${i} из ${n}`,
   batchDone: (measured: number, failed: number) =>
     `Songwriter: измерено ${measured}` + (failed > 0 ? `, не удалось прочитать ${failed}` : ""),

@@ -94,6 +94,30 @@ export default async function run() {
     s.check("a measurement keeps a record", () => t["measured.mp3"].bpm === 130);
   }
 
+  // ---- which measurements the batch button takes up again ----
+  {
+    const data = {
+      tracks: {
+        "new.mp3": track({ bpm: 120, key: "Eb", scale: "minor", keyStrength: 0.73 }),
+        "old.mp3": track({ bpm: 154, key: "C", scale: "minor", scaleAlt: null, keyVotes: 5 }),
+        "hand.mp3": track({ bpm: 154, key: "C", scale: "minor", keyVotes: 5, musicalEdited: true }),
+        "none.mp3": track({ plays: 3 })
+      }
+    };
+    const { saved } = await roundTrip(data);
+    s.check("the current detectors' certainty survives a restart",
+      () => saved.tracks["new.mp3"].keyStrength === 0.73);
+    // load what was just saved, as the next start would
+    const plugin = makePlugin();
+    files = { [DATA]: JSON.stringify(saved) };
+    await plugin.loadSettings();
+    s.check("a current measurement is not measured again", () => plugin.isMeasured("new.mp3"));
+    s.check("an essentia measurement is measured again", () => !plugin.isMeasured("old.mp3"));
+    s.check("while its old tempo stays on show", () => plugin.settings.tracks["old.mp3"].bpm === 154);
+    s.check("a hand correction is never measured again", () => plugin.isMeasured("hand.mp3"));
+    s.check("an unmeasured track is measured", () => !plugin.isMeasured("none.mp3"));
+  }
+
   // ---- counters ----
   {
     const { saved } = await roundTrip({
